@@ -1,0 +1,9 @@
+target/
+.idea/
+*.iml
+.git/
+.gitignore
+HELP.md
+README.md
+docs/
+src/main/resources/secrets.properties
