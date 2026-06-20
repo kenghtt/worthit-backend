@@ -60,6 +60,18 @@ Key properties:
 
 ## Running locally
 
+### Start Local Postgres DB
+```dockerfile
+docker run -d \
+  --name postgres-local \
+  -e POSTGRES_DB=worthit \
+  -e POSTGRES_USER=worthit_app \
+  -e POSTGRES_PASSWORD=test123 \
+  -p 5432:5432 \
+  -v postgres_data:/var/lib/postgresql/18/docker \
+  postgres:18
+```
+
 ```bash
 ./mvnw spring-boot:run
 ```
