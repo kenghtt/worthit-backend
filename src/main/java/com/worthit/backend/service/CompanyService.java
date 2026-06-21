@@ -3,10 +3,15 @@ package com.worthit.backend.service;
 import com.worthit.backend.dto.CompanyDetail;
 import com.worthit.backend.dto.CompanySummary;
 import com.worthit.backend.dto.PageResponse;
+import com.worthit.backend.dto.RoleSummary;
 import com.worthit.backend.entity.Company;
+import com.worthit.backend.entity.CompanyRole;
+import com.worthit.backend.entity.Experience;
 import com.worthit.backend.entity.ExperienceStatus;
+import com.worthit.backend.entity.Role;
 import com.worthit.backend.exception.ResourceNotFoundException;
 import com.worthit.backend.repository.CompanyRepository;
+import com.worthit.backend.repository.CompanyRoleRepository;
 import com.worthit.backend.repository.CompanyStatsProjection;
 import com.worthit.backend.repository.ExperienceRepository;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +52,7 @@ public class CompanyService {
     static final int SEARCH_MAX_LIMIT = 20;
 
     private final CompanyRepository companyRepository;
+    private final CompanyRoleRepository companyRoleRepository;
     private final ExperienceRepository experienceRepository;
 
     @Transactional(readOnly = true)
@@ -133,6 +139,88 @@ public class CompanyService {
                 c.getIndustry(),
                 c.getHeadquarters()
         );
+    }
+
+    /**
+     * Lists the roles available at a company, each with per-role aggregate stats
+     * (see {@code api-endpoints.md} §2.3). The role list is driven by the {@code company_role}
+     * join (see {@code database-spec.md} §5); stats — counts, average worth/stress, and the
+     * base-salary min/max/average — are computed from the company's {@code published} experiences
+     * (see §10). Roles with no published experiences are still listed, with {@code null} stats.
+     *
+     * <p>Like §2.1, aggregation is done in memory and the result is name-sorted and
+     * cursor-paged.</p>
+     *
+     * @throws ResourceNotFoundException if no active company with the slug exists
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<RoleSummary> listCompanyRoles(String slug, String cursor, Integer limit) {
+        Company company = companyRepository.findBySlug(slug)
+                .filter(Company::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException("Company not found: " + slug));
+
+        int pageSize = normalizeLimit(limit);
+
+        Map<Long, List<Experience>> experiencesByRole = experienceRepository
+                .findByCompany_IdAndStatus(company.getId(), ExperienceStatus.published)
+                .stream()
+                .collect(Collectors.groupingBy(e -> e.getRole().getId()));
+
+        List<RoleSummary> all = companyRoleRepository.findActiveWithRoleByCompanyId(company.getId()).stream()
+                .map(CompanyRole::getRole)
+                .filter(Role::isActive)
+                .map(role -> toRoleSummary(role, experiencesByRole.getOrDefault(role.getId(), List.of())))
+                .sorted(Comparator
+                        .comparing((RoleSummary r) -> r.name().toLowerCase(Locale.ROOT))
+                        .thenComparing(RoleSummary::slug))
+                .toList();
+
+        int offset = decodeCursor(cursor);
+        if (offset < 0 || offset >= all.size()) {
+            return new PageResponse<>(List.of(), null);
+        }
+
+        int end = Math.min(offset + pageSize, all.size());
+        List<RoleSummary> pageItems = all.subList(offset, end);
+        String nextCursor = end < all.size() ? encodeCursor(end) : null;
+        return new PageResponse<>(pageItems, nextCursor);
+    }
+
+    private RoleSummary toRoleSummary(Role role, List<Experience> experiences) {
+        Integer salaryMin = experiences.isEmpty() ? null
+                : experiences.stream().mapToInt(Experience::getBaseSalary).min().getAsInt();
+        Integer salaryMax = experiences.isEmpty() ? null
+                : experiences.stream().mapToInt(Experience::getBaseSalary).max().getAsInt();
+        return new RoleSummary(
+                role.getSlug(),
+                role.getName(),
+                experiences.size(),
+                averageScore(experiences, Experience::getWorthItScore),
+                averageScore(experiences, Experience::getStressLevel),
+                salaryMin,
+                salaryMax,
+                averageSalary(experiences)
+        );
+    }
+
+    private static BigDecimal averageScore(List<Experience> experiences,
+                                           Function<Experience, BigDecimal> field) {
+        if (experiences.isEmpty()) {
+            return null;
+        }
+        BigDecimal sum = experiences.stream()
+                .map(field)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return sum.divide(BigDecimal.valueOf(experiences.size()), 1, RoundingMode.HALF_UP);
+    }
+
+    private static Integer averageSalary(List<Experience> experiences) {
+        if (experiences.isEmpty()) {
+            return null;
+        }
+        // Sum as long to avoid overflow, then divide by count and round to whole USD.
+        long sum = experiences.stream().mapToLong(Experience::getBaseSalary).sum();
+        return (int) Math.round((double) sum / experiences.size());
     }
 
     private CompanySummary toSummary(Company c, CompanyStatsProjection stats) {

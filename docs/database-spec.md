@@ -269,7 +269,7 @@ Per **company**:
 
 Per **company + role**:
 - `experience_count`, `avg_worth_score`, `avg_stress`
-- salary range (min/max/median `base_salary`)
+- salary range (min/max/average `base_salary`)
 
 Per **location (city)**:
 - `experience_count`, `company_count` (DISTINCT `company_id`)

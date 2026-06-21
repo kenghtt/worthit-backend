@@ -13,6 +13,12 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
     long countByCompany_Id(Long companyId);
 
     /**
+     * All experiences for a company in the given status (see {@code api-endpoints.md} §2.3).
+     * Loaded so per-role aggregates — including the salary median — can be computed in memory.
+     */
+    List<Experience> findByCompany_IdAndStatus(Long companyId, ExperienceStatus status);
+
+    /**
      * Per-company aggregate stats over experiences in the given status (see
      * {@code database-spec.md} §10). Companies with no matching experiences are not returned.
      */

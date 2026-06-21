@@ -119,10 +119,22 @@ aggregate stats):
 
 `404` if the slug does not exist.
 
-### 2.3 Company roles
+### 2.3 Company roles ✅
 `GET /api/v1/companies/{slug}/roles`
 
-Returns the roles available at the company, each with per-role aggregate stats:
+Query params (all optional):
+
+| Param    | Type   | Description          |
+|----------|--------|----------------------|
+| `cursor` | string | Pagination cursor.   |
+| `limit`  | int    | Page size.           |
+
+Returns `Page<RoleSummary>` — the roles available at the company (driven by the
+`company_role` join, see `database-spec.md` §5), each with per-role aggregate
+stats computed from the company's `published` experiences. Salary figures are
+whole USD, where `baseSalaryAverage` is the mean of the role's base salaries
+(sum ÷ count); a role with no published experiences yet is still listed with
+`null` stats and `experienceCount: 0`. `404` if the slug does not exist.
 
 ```json
 {
@@ -135,7 +147,7 @@ Returns the roles available at the company, each with per-role aggregate stats:
       "avgStress": 6.5,
       "baseSalaryMin": 130000,
       "baseSalaryMax": 145000,
-      "baseSalaryMedian": 140000
+      "baseSalaryAverage": 138333
     }
   ],
   "next_cursor": null

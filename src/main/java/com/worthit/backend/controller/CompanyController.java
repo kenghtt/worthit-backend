@@ -3,6 +3,7 @@ package com.worthit.backend.controller;
 import com.worthit.backend.dto.CompanyDetail;
 import com.worthit.backend.dto.CompanySummary;
 import com.worthit.backend.dto.PageResponse;
+import com.worthit.backend.dto.RoleSummary;
 import com.worthit.backend.service.CompanyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,5 +65,19 @@ public class CompanyController {
     public CompanyDetail getCompany(@PathVariable String slug) {
         log.debug("GET /api/v1/companies/{}", slug);
         return companyService.getCompany(slug);
+    }
+
+    /**
+     * {@code GET /api/v1/companies/{slug}/roles} — roles available at a company, each with
+     * per-role aggregate stats (see {@code api-endpoints.md} §2.3). Returns {@code 404}
+     * (via {@code GlobalExceptionHandler}) if no active company has the slug.
+     */
+    @GetMapping("/{slug}/roles")
+    public PageResponse<RoleSummary> listCompanyRoles(
+            @PathVariable String slug,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer limit) {
+        log.debug("GET /api/v1/companies/{}/roles cursor={} limit={}", slug, cursor, limit);
+        return companyService.listCompanyRoles(slug, cursor, limit);
     }
 }
