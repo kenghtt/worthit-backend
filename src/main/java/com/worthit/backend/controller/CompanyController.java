@@ -1,11 +1,13 @@
 package com.worthit.backend.controller;
 
+import com.worthit.backend.dto.CompanyDetail;
 import com.worthit.backend.dto.CompanySummary;
 import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.service.CompanyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,5 +38,31 @@ public class CompanyController {
         log.debug("GET /api/v1/companies q={} industry={} sort={} order={} cursor={} limit={}",
                 companySubstring, industry, sort, order, cursor, limit);
         return companyService.listCompanies(companySubstring, industry, sort, order, cursor, limit);
+    }
+
+    /**
+     * {@code GET /api/v1/companies/search} — lightweight typeahead for the search bar
+     * (see {@code api-endpoints.md} §2.5). Returns a single capped page of matching companies'
+     * basic profiles; a blank/missing {@code q} yields an empty page.
+     *
+     * <p>The literal {@code /search} segment is matched ahead of the {@code /{slug}} mapping
+     * below, so it is never treated as a company slug.</p>
+     */
+    @GetMapping("/search")
+    public PageResponse<CompanyDetail> searchCompanies(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) Integer limit) {
+        log.debug("GET /api/v1/companies/search q={} limit={}", q, limit);
+        return companyService.searchCompanies(q, limit);
+    }
+
+    /**
+     * {@code GET /api/v1/companies/{slug}} — single company detail (see {@code api-endpoints.md} §2.2).
+     * Returns {@code 404} (via {@code GlobalExceptionHandler}) if no active company has the slug.
+     */
+    @GetMapping("/{slug}")
+    public CompanyDetail getCompany(@PathVariable String slug) {
+        log.debug("GET /api/v1/companies/{}", slug);
+        return companyService.getCompany(slug);
     }
 }

@@ -102,21 +102,18 @@ Returns `Page<CompanySummary>`:
 
 Used by: companies list page, homepage company typeahead/search.
 
-### 2.2 Company detail
+### 2.2 Company detail ✅
 `GET /api/v1/companies/{slug}`
 
-Returns `CompanyDetail` (summary + stats):
+Returns `CompanyDetail` — the company's basic profile only (intentionally lightweight, no
+aggregate stats):
 
 ```json
 {
   "slug": "amazon",
   "name": "Amazon",
   "industry": "Tech",
-  "headquarters": "Seattle, WA",
-  "experienceCount": 5,
-  "roleCount": 3,
-  "avgWorthScore": 7.4,
-  "avgStress": 6.8
+  "headquarters": "Seattle, WA"
 }
 ```
 
@@ -196,6 +193,44 @@ UI renders today):**
 > separate columns. See `database-spec.md` §8/§10.
 
 Used by: experiences list page + individual experience modal.
+
+### 2.5 Company search (typeahead) ✅
+`GET /api/v1/companies/search`
+
+A deliberately lightweight, search-bar-only endpoint. Given the substring a user
+is typing (`am` → `ama` → `amaz`), it returns the matching companies' **basic
+profiles only** — no aggregate stats, no sort knobs. Use §2.1 for the full
+companies list page; use this for autocomplete/typeahead where latency matters.
+
+Query params:
+
+| Param   | Type   | Description                                                       |
+|---------|--------|-------------------------------------------------------------------|
+| `q`     | string | **Required.** Case-insensitive substring match on company name.   |
+| `limit` | int    | Optional max results (default e.g. 8, max e.g. 20).               |
+
+Returns `Page<CompanyDetail>`, where each item is the lightweight `CompanyDetail`
+shape from §2.2 (`slug`, `name`, `industry`, `headquarters`). Results are name-
+sorted; `next_cursor` is `null` (typeahead returns a single capped page):
+
+```json
+{
+  "items": [
+    {
+      "slug": "amazon",
+      "name": "Amazon",
+      "industry": "Tech",
+      "headquarters": "Seattle, WA"
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+> A blank/missing `q` returns an empty `items` list (the search bar has nothing
+> to match yet).
+
+Used by: homepage / global search bar company typeahead.
 
 ---
 
@@ -327,7 +362,7 @@ form can use free text), but recommended:
 
 | Endpoint                                   | Purpose                                  |
 |--------------------------------------------|------------------------------------------|
-| `GET /api/v1/companies?q=...&limit=8`       | Company typeahead (already used).        |
+| `GET /api/v1/companies/search?q=...&limit=8` | Company typeahead (lightweight, §2.5).   |
 | `GET /api/v1/roles`                         | Global list of roles for the role picker.|
 | `GET /api/v1/companies/{slug}/levels`       | Per-company level options for the form.  |
 
@@ -371,6 +406,7 @@ Already implemented by `HelloController` (starter). Keep for readiness checks:
 |--------|-------------------------------------------------------------|----------------|-----------------------------------|
 | GET    | `/api/v1/companies`                                         | public         | companies list, home search       |
 | GET    | `/api/v1/companies/{slug}`                                  | public         | company detail                    |
+| GET    | `/api/v1/companies/search`                                  | public         | search bar typeahead              |
 | GET    | `/api/v1/companies/{slug}/roles`                            | public         | company detail (roles)            |
 | GET    | `/api/v1/companies/{slug}/roles/{roleSlug}/experiences`     | public         | experiences list + modal          |
 | GET    | `/api/v1/locations`                                         | public         | locations list                    |
