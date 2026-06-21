@@ -156,53 +156,67 @@ whole USD, where `baseSalaryAverage` is the mean of the role's base salaries
 
 Used by: company detail page (role cards).
 
-### 2.4 Experiences for a company + role
+### 2.4 Experiences for a company + role ✅
 `GET /api/v1/companies/{slug}/roles/{roleSlug}/experiences`
 
-Query params:
+Query params (all optional):
 
 | Param    | Type   | Description                                  |
 |----------|--------|----------------------------------------------|
-| `city`   | string | Optional city slug filter.                   |
+| `city`   | string | City **slug** filter (e.g. `seattle-wa`).    |
 | `cursor` | string | Pagination cursor.                           |
-| `limit`  | int    | Page size.                                   |
+| `limit`  | int    | Page size (default `20`, max `50`).          |
 
-Returns `Page<Experience>`. **Experience object (response shape matches what the
-UI renders today):**
+Returns `Page<ExperienceSummary>`, newest first (`created_at` desc, `id` desc
+tiebreaker), restricted to `published` experiences. Each item **mirrors the
+`experience` DB columns** (see `database-spec.md` §8) rather than the UI's mock
+field names: field keys come from the global `snake_case` Jackson strategy
+(e.g. `worth_it_score`, `stress_level`, `wish_knew`, `created_at`), and the
+foreign keys are expanded into their natural identifiers (company/role slug +
+name, location slug/city/state, level name). `id` is the numeric experience id.
+
+`employment_status` is the DB enum value — one of `current` / `past` (note:
+`past`, not `former`). These fields are nullable and serialize as `null` when
+unset: `level_name`, `years_at_company`, `hours_per_week`, `why_stay`,
+`why_leave`, `wish_knew`. `created_at` is an ISO-8601 timestamp (UTC).
 
 ```json
 {
   "items": [
     {
-      "id": "amz-swe-1",
-      "company": "Amazon",
-      "role": "Software Engineer",
-      "level": "SDE II",
-      "yearsExperience": 3,
-      "location": "Seattle, WA",
-      "submittedDate": "May 2026",
-      "baseSalary": 145000,
+      "id": 1,
+      "company_slug": "amazon",
+      "company_name": "Amazon",
+      "role_slug": "software-engineer",
+      "role_name": "Software Engineer",
+      "location_slug": "seattle-wa",
+      "city": "Seattle",
+      "state": "WA",
+      "level_name": "SDE II",
+      "employment_status": "current",
+      "years_experience": 3,
+      "years_at_company": 2,
+      "base_salary": 145000,
       "bonus": 15000,
-      "equity": 20000,
-      "stress": 6.5,
-      "hoursMin": 40,
-      "hoursMax": 50,
-      "worthScore": 7.5,
-      "whatWasItLike": "Good learning experience...",
-      "advice": "Ask about the team's on-call rotation..."
+      "stock": 20000,
+      "signing_bonus": 10000,
+      "compensation_year": 2025,
+      "stress_level": 6.5,
+      "hours_per_week": 45,
+      "worth_it_score": 7.5,
+      "why_stay": "Strong comp and learning.",
+      "why_leave": "On-call burnout.",
+      "wish_knew": "Ask about on-call rotation before joining.",
+      "created_at": "2026-05-01T12:00:00Z"
     }
   ],
   "next_cursor": null
 }
 ```
 
-> **Field-name mapping (DB → API):** the DB columns differ from the UI field
-> names. The serializer should map:
-> `worth_it_score → worthScore`, `stock → equity`, `stress_level → stress`,
-> `wish_knew → advice` (or `whatWasItLike`), `created_at → submittedDate`
-> (formatted e.g. `"May 2026"`), and `location.city + state → location` string.
-> `hours_per_week` maps to both `hoursMin`/`hoursMax` (equal) unless the DB adds
-> separate columns. See `database-spec.md` §8/§10.
+> The role list / role slug comes from §2.3. `404` if the company slug or role
+> slug does not exist, or if the role is not offered at the company (no
+> `company_role` link); an unknown `city` slug yields an empty page (not a 404).
 
 Used by: experiences list page + individual experience modal.
 

@@ -2,18 +2,21 @@ package com.worthit.backend.service;
 
 import com.worthit.backend.dto.CompanyDetail;
 import com.worthit.backend.dto.CompanySummary;
+import com.worthit.backend.dto.ExperienceSummary;
 import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.dto.RoleSummary;
 import com.worthit.backend.entity.Company;
 import com.worthit.backend.entity.CompanyRole;
 import com.worthit.backend.entity.Experience;
 import com.worthit.backend.entity.ExperienceStatus;
+import com.worthit.backend.entity.Location;
 import com.worthit.backend.entity.Role;
 import com.worthit.backend.exception.ResourceNotFoundException;
 import com.worthit.backend.repository.CompanyRepository;
 import com.worthit.backend.repository.CompanyRoleRepository;
 import com.worthit.backend.repository.CompanyStatsProjection;
 import com.worthit.backend.repository.ExperienceRepository;
+import com.worthit.backend.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,12 +33,13 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Read-side logic for {@code GET /api/v1/companies} (see {@code api-endpoints.md} §2.1):
- * case-insensitive name search, industry filter, sorting, and cursor pagination.
+ * Read-side logic for the company endpoints (see {@code api-endpoints.md} §2.1–2.5): company
+ * list/search, company detail, search-bar typeahead, per-company roles, and the experiences for
+ * a company + role.
  *
  * <p>Aggregate stats are computed from {@code published} experiences. Given the current data
- * size the company list is filtered/sorted/paged in memory, which keeps support for sorting by
- * derived aggregates (worth score, experience count) straightforward.</p>
+ * size results are filtered/sorted/paged in memory (see {@link #paginate}), which keeps support
+ * for sorting by derived aggregates (worth score, experience count) straightforward.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -53,6 +57,7 @@ public class CompanyService {
 
     private final CompanyRepository companyRepository;
     private final CompanyRoleRepository companyRoleRepository;
+    private final RoleRepository roleRepository;
     private final ExperienceRepository experienceRepository;
 
     @Transactional(readOnly = true)
@@ -78,15 +83,7 @@ public class CompanyService {
                 .sorted(comparator(sort, order))
                 .toList();
 
-        int offset = decodeCursor(cursor);
-        if (offset < 0 || offset >= all.size()) {
-            return new PageResponse<>(List.of(), null);
-        }
-
-        int end = Math.min(offset + pageSize, all.size());
-        List<CompanySummary> pageItems = all.subList(offset, end);
-        String nextCursor = end < all.size() ? encodeCursor(end) : null;
-        return new PageResponse<>(pageItems, nextCursor);
+        return paginate(all, cursor, pageSize);
     }
 
     /**
@@ -175,15 +172,7 @@ public class CompanyService {
                         .thenComparing(RoleSummary::slug))
                 .toList();
 
-        int offset = decodeCursor(cursor);
-        if (offset < 0 || offset >= all.size()) {
-            return new PageResponse<>(List.of(), null);
-        }
-
-        int end = Math.min(offset + pageSize, all.size());
-        List<RoleSummary> pageItems = all.subList(offset, end);
-        String nextCursor = end < all.size() ? encodeCursor(end) : null;
-        return new PageResponse<>(pageItems, nextCursor);
+        return paginate(all, cursor, pageSize);
     }
 
     private RoleSummary toRoleSummary(Role role, List<Experience> experiences) {
@@ -221,6 +210,82 @@ public class CompanyService {
         // Sum as long to avoid overflow, then divide by count and round to whole USD.
         long sum = experiences.stream().mapToLong(Experience::getBaseSalary).sum();
         return (int) Math.round((double) sum / experiences.size());
+    }
+
+    /**
+     * Lists the {@code published} experiences for a company + role (see {@code api-endpoints.md}
+     * §2.4), newest first, optionally filtered to a single city (by location slug). Each item
+     * mirrors the {@code experience} DB columns (see {@link ExperienceSummary}).
+     *
+     * <p>Like §2.1/§2.3, the matching rows are sorted and paged in memory.</p>
+     *
+     * @throws ResourceNotFoundException if no active company or role with the given slug exists,
+     *                                   or the role is not offered at the company
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<ExperienceSummary> listExperiences(String slug, String roleSlug, String city,
+                                                           String cursor, Integer limit) {
+        Company company = companyRepository.findBySlug(slug)
+                .filter(Company::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException("Company not found: " + slug));
+        Role role = roleRepository.findBySlug(roleSlug)
+                .filter(Role::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + roleSlug));
+        if (!companyRoleRepository.existsByCompany_IdAndRole_Id(company.getId(), role.getId())) {
+            throw new ResourceNotFoundException(
+                    "Role not offered at company: " + slug + "/" + roleSlug);
+        }
+
+        int pageSize = normalizeLimit(limit);
+        String citySlug = (city == null || city.isBlank()) ? null : city.trim();
+
+        // Newest first, with id as a stable tiebreaker so cursor paging is deterministic.
+        Comparator<Experience> newestFirst = Comparator
+                .comparing(Experience::getCreatedAt)
+                .thenComparing(Experience::getId)
+                .reversed();
+
+        List<ExperienceSummary> all = experienceRepository
+                .findForCompanyRole(company.getId(), role.getId(), ExperienceStatus.published)
+                .stream()
+                .filter(e -> citySlug == null || citySlug.equalsIgnoreCase(e.getLocation().getSlug()))
+                .sorted(newestFirst)
+                .map(this::toExperienceSummary)
+                .toList();
+
+        return paginate(all, cursor, pageSize);
+    }
+
+    private ExperienceSummary toExperienceSummary(Experience e) {
+        Location loc = e.getLocation();
+        String levelName = e.getLevelName() != null ? e.getLevelName()
+                : (e.getLevel() != null ? e.getLevel().getName() : null);
+        return new ExperienceSummary(
+                e.getId(),
+                e.getCompany().getSlug(),
+                e.getCompany().getName(),
+                e.getRole().getSlug(),
+                e.getRole().getName(),
+                loc.getSlug(),
+                loc.getCity(),
+                loc.getState(),
+                levelName,
+                e.getEmploymentStatus(),
+                e.getYearsExperience(),
+                e.getYearsAtCompany(),
+                e.getBaseSalary(),
+                e.getBonus(),
+                e.getStock(),
+                e.getSigningBonus(),
+                e.getCompensationYear(),
+                e.getStressLevel(),
+                e.getHoursPerWeek(),
+                e.getWorthItScore(),
+                e.getWhyStay(),
+                e.getWhyLeave(),
+                e.getWishKnew(),
+                e.getCreatedAt()
+        );
     }
 
     private CompanySummary toSummary(Company c, CompanyStatsProjection stats) {
@@ -274,6 +339,22 @@ public class CompanyService {
         Comparator<CompanySummary> withTieBreak = base.thenComparing(CompanySummary::slug);
         boolean descending = order != null && order.trim().equalsIgnoreCase("desc");
         return descending ? withTieBreak.reversed() : withTieBreak;
+    }
+
+    /**
+     * Applies offset cursor pagination to an already filtered/sorted list: slices out the page
+     * starting at the decoded {@code cursor} offset and computes the {@code next_cursor}
+     * (see {@code api-endpoints.md} §1 "Pagination"). An out-of-range/exhausted offset yields an
+     * empty page with a {@code null} cursor.
+     */
+    private static <T> PageResponse<T> paginate(List<T> all, String cursor, int pageSize) {
+        int offset = decodeCursor(cursor);
+        if (offset < 0 || offset >= all.size()) {
+            return new PageResponse<>(List.of(), null);
+        }
+        int end = Math.min(offset + pageSize, all.size());
+        String nextCursor = end < all.size() ? encodeCursor(end) : null;
+        return new PageResponse<>(all.subList(offset, end), nextCursor);
     }
 
     private static String encodeCursor(int offset) {

@@ -2,6 +2,7 @@ package com.worthit.backend.controller;
 
 import com.worthit.backend.dto.CompanyDetail;
 import com.worthit.backend.dto.CompanySummary;
+import com.worthit.backend.dto.ExperienceSummary;
 import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.dto.RoleSummary;
 import com.worthit.backend.service.CompanyService;
@@ -79,5 +80,23 @@ public class CompanyController {
             @RequestParam(required = false) Integer limit) {
         log.debug("GET /api/v1/companies/{}/roles cursor={} limit={}", slug, cursor, limit);
         return companyService.listCompanyRoles(slug, cursor, limit);
+    }
+
+    /**
+     * {@code GET /api/v1/companies/{slug}/roles/{roleSlug}/experiences} — published experiences
+     * for a company + role, newest first (see {@code api-endpoints.md} §2.4). Optional {@code city}
+     * filters by location slug. Returns {@code 404} (via {@code GlobalExceptionHandler}) if no
+     * active company or role has the given slug.
+     */
+    @GetMapping("/{slug}/roles/{roleSlug}/experiences")
+    public PageResponse<ExperienceSummary> listExperiences(
+            @PathVariable String slug,
+            @PathVariable String roleSlug,
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer limit) {
+        log.debug("GET /api/v1/companies/{}/roles/{}/experiences city={} cursor={} limit={}",
+                slug, roleSlug, city, cursor, limit);
+        return companyService.listExperiences(slug, roleSlug, city, cursor, limit);
     }
 }
