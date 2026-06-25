@@ -1,7 +1,10 @@
 package com.worthit.backend.service;
 
+import com.worthit.backend.dto.LocationCompanySummary;
 import com.worthit.backend.dto.LocationSummary;
 import com.worthit.backend.dto.PageResponse;
+import com.worthit.backend.entity.Company;
+import com.worthit.backend.entity.Experience;
 import com.worthit.backend.entity.ExperienceStatus;
 import com.worthit.backend.entity.Location;
 import com.worthit.backend.exception.ResourceNotFoundException;
@@ -96,6 +99,63 @@ public class LocationService {
                 .orElse(null);
 
         return toSummary(location, stats);
+    }
+
+    /**
+     * Lists the companies that have {@code published} experiences in a location, each with stats
+     * scoped to that city (see {@code api-endpoints.md} §3.3). A company only appears if it has at
+     * least one published experience in the city; stats — experience count and average
+     * worth/stress — are computed from just those experiences.
+     *
+     * <p>Like §3.1, results are name-sorted (slug tiebreaker) and cursor-paged in memory.</p>
+     *
+     * @throws ResourceNotFoundException if no active location with the slug exists
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<LocationCompanySummary> listLocationCompanies(String slug, String cursor,
+                                                                      Integer limit) {
+        Location location = locationRepository.findBySlug(slug)
+                .filter(Location::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException("Location not found: " + slug));
+
+        int pageSize = normalizeLimit(limit);
+
+        List<LocationCompanySummary> all = experienceRepository
+                .findForLocation(location.getId(), ExperienceStatus.published)
+                .stream()
+                .collect(Collectors.groupingBy(e -> e.getCompany().getId()))
+                .values()
+                .stream()
+                .map(this::toLocationCompanySummary)
+                .sorted(Comparator
+                        .comparing((LocationCompanySummary c) -> c.name().toLowerCase(Locale.ROOT))
+                        .thenComparing(LocationCompanySummary::slug))
+                .toList();
+
+        return paginate(all, cursor, pageSize);
+    }
+
+    private LocationCompanySummary toLocationCompanySummary(List<Experience> experiences) {
+        Company company = experiences.get(0).getCompany();
+        return new LocationCompanySummary(
+                company.getSlug(),
+                company.getName(),
+                company.getIndustry(),
+                experiences.size(),
+                averageScore(experiences, Experience::getWorthItScore),
+                averageScore(experiences, Experience::getStressLevel)
+        );
+    }
+
+    private static BigDecimal averageScore(List<Experience> experiences,
+                                           Function<Experience, BigDecimal> field) {
+        if (experiences.isEmpty()) {
+            return null;
+        }
+        BigDecimal sum = experiences.stream()
+                .map(field)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return sum.divide(BigDecimal.valueOf(experiences.size()), 1, RoundingMode.HALF_UP);
     }
 
     private LocationSummary toSummary(Location l, LocationStatsProjection stats) {

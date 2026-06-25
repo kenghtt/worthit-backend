@@ -36,6 +36,19 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
                                         @Param("status") ExperienceStatus status);
 
     /**
+     * Experiences in a location in the given status (see {@code api-endpoints.md} §3.3), with the
+     * company eagerly fetched so per-company stats scoped to the city can be computed in memory
+     * without an N+1.
+     */
+    @Query("""
+            select e from Experience e
+            join fetch e.company c
+            where e.location.id = :locationId and e.status = :status
+            """)
+    List<Experience> findForLocation(@Param("locationId") Long locationId,
+                                     @Param("status") ExperienceStatus status);
+
+    /**
      * Per-company aggregate stats over experiences in the given status (see
      * {@code database-spec.md} §10). Companies with no matching experiences are not returned.
      */

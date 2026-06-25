@@ -291,7 +291,7 @@ Returns `Page<LocationSummary>`:
 
 Returns a single `LocationSummary` (same shape as above). `404` if not found.
 
-### 3.3 Companies in a location
+### 3.3 Companies in a location ✅
 `GET /api/v1/locations/{slug}/companies`
 
 Returns the companies that have experiences in this city, with per-company
