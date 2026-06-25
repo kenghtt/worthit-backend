@@ -286,7 +286,7 @@ Returns `Page<LocationSummary>`:
 }
 ```
 
-### 3.2 Location detail
+### 3.2 Location detail ✅
 `GET /api/v1/locations/{slug}`
 
 Returns a single `LocationSummary` (same shape as above). `404` if not found.
