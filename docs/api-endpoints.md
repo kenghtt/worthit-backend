@@ -262,8 +262,8 @@ Used by: homepage / global search bar company typeahead.
 
 ## 3. Locations
 
-### 3.1 List / search locations
-`GET /api/v1/locations`
+### 3.1 List / search locations ✅
+`GET /api/v1/locations` 
 
 Query params: `q` (city name substring), `cursor`, `limit`.
 

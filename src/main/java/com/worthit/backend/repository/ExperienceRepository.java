@@ -50,4 +50,20 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
             group by e.company.id
             """)
     List<CompanyStatsProjection> aggregateByCompany(@Param("status") ExperienceStatus status);
+
+    /**
+     * Per-location aggregate stats over experiences in the given status (see
+     * {@code api-endpoints.md} §3.1). Locations with no matching experiences are not returned.
+     */
+    @Query("""
+            select e.location.id as locationId,
+                   count(e) as experienceCount,
+                   count(distinct e.company.id) as companyCount,
+                   avg(e.worthItScore) as avgWorthScore,
+                   avg(e.stressLevel) as avgStress
+            from Experience e
+            where e.status = :status
+            group by e.location.id
+            """)
+    List<LocationStatsProjection> aggregateByLocation(@Param("status") ExperienceStatus status);
 }
