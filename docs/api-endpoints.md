@@ -388,20 +388,23 @@ and therefore do **not** appear in read endpoints until published/moderated.
 
 ---
 
-## 5. Reference / lookup endpoints (supporting the submit form)
+## 5. Reference / lookup endpoints (supporting the submit form) ✅
 
 These help the submit form populate dropdowns. Optional for a first pass (the
 form can use free text), but recommended:
 
 | Endpoint                                   | Purpose                                  |
 |--------------------------------------------|------------------------------------------|
-| `GET /api/v1/companies/search?q=...&limit=8` | Company typeahead (lightweight, §2.5).   |
-| `GET /api/v1/roles`                         | Global list of roles for the role picker.|
-| `GET /api/v1/companies/{slug}/levels`       | Per-company level options for the form.  |
+| `GET /api/v1/companies/search?q=...&limit=8` | Company typeahead (lightweight, §2.5). ✅ |
+| `GET /api/v1/roles`                         | Global list of roles for the role picker. ✅ |
+| `GET /api/v1/companies/{slug}/levels`       | Per-company level options for the form. ✅ |
 
-`GET /api/v1/roles` returns `Page<RoleSummary>` (`slug`, `name`, `family`).
-`GET /api/v1/companies/{slug}/levels` returns levels ordered by
-`normalizedRank` (`name`, `normalizedRank`).
+`GET /api/v1/roles` returns `Page<RoleLookupSummary>` (`slug`, `name`, `family`).
+Name-sorted; accepts optional `cursor` + `limit` (see §1).
+
+`GET /api/v1/companies/{slug}/levels` returns `Page<LevelSummary>` with levels
+ordered by `normalizedRank` ascending (`name`, `normalizedRank`). `404` if the
+company slug does not exist. Accepts optional `cursor` + `limit` (see §1).
 
 ---
 

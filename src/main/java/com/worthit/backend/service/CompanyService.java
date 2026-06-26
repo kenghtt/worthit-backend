@@ -3,18 +3,21 @@ package com.worthit.backend.service;
 import com.worthit.backend.dto.CompanyDetail;
 import com.worthit.backend.dto.CompanySummary;
 import com.worthit.backend.dto.ExperienceSummary;
+import com.worthit.backend.dto.LevelSummary;
 import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.dto.RoleSummary;
 import com.worthit.backend.entity.Company;
 import com.worthit.backend.entity.CompanyRole;
 import com.worthit.backend.entity.Experience;
 import com.worthit.backend.entity.ExperienceStatus;
+import com.worthit.backend.entity.Level;
 import com.worthit.backend.entity.Role;
 import com.worthit.backend.exception.ResourceNotFoundException;
 import com.worthit.backend.repository.CompanyRepository;
 import com.worthit.backend.repository.CompanyRoleRepository;
 import com.worthit.backend.repository.CompanyStatsProjection;
 import com.worthit.backend.repository.ExperienceRepository;
+import com.worthit.backend.repository.LevelRepository;
 import com.worthit.backend.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -58,6 +61,7 @@ public class CompanyService {
     private final CompanyRoleRepository companyRoleRepository;
     private final RoleRepository roleRepository;
     private final ExperienceRepository experienceRepository;
+    private final LevelRepository levelRepository;
 
     @Transactional(readOnly = true)
     public PageResponse<CompanySummary> listCompanies(String companySubstring, String industry,
@@ -169,6 +173,29 @@ public class CompanyService {
                 .sorted(Comparator
                         .comparing((RoleSummary r) -> r.name().toLowerCase(Locale.ROOT))
                         .thenComparing(RoleSummary::slug))
+                .toList();
+
+        return paginate(all, cursor, pageSize);
+    }
+
+    /**
+     * Lists the level options for a company's submit-form level picker (see {@code api-endpoints.md}
+     * §5), ordered by {@code normalizedRank} ascending. Returns {@code 404} if no active company
+     * has the slug.
+     *
+     * @throws ResourceNotFoundException if no active company with the slug exists
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<LevelSummary> listCompanyLevels(String slug, String cursor, Integer limit) {
+        Company company = companyRepository.findBySlug(slug)
+                .filter(Company::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException("Company not found: " + slug));
+
+        int pageSize = normalizeLimit(limit);
+
+        List<LevelSummary> all = levelRepository.findByCompany_IdOrderByNormalizedRankAsc(company.getId()).stream()
+                .filter(Level::isActive)
+                .map(l -> new LevelSummary(l.getName(), l.getNormalizedRank()))
                 .toList();
 
         return paginate(all, cursor, pageSize);

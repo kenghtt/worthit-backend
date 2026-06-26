@@ -3,6 +3,7 @@ package com.worthit.backend.controller;
 import com.worthit.backend.dto.CompanyDetail;
 import com.worthit.backend.dto.CompanySummary;
 import com.worthit.backend.dto.ExperienceSummary;
+import com.worthit.backend.dto.LevelSummary;
 import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.dto.RoleSummary;
 import com.worthit.backend.service.CompanyService;
@@ -80,6 +81,20 @@ public class CompanyController {
             @RequestParam(required = false) Integer limit) {
         log.debug("GET /api/v1/companies/{}/roles cursor={} limit={}", slug, cursor, limit);
         return companyService.listCompanyRoles(slug, cursor, limit);
+    }
+
+    /**
+     * {@code GET /api/v1/companies/{slug}/levels} — per-company level options for the submit-form
+     * level picker (see {@code api-endpoints.md} §5), ordered by {@code normalizedRank}. Returns
+     * {@code 404} (via {@code GlobalExceptionHandler}) if no active company has the slug.
+     */
+    @GetMapping("/{slug}/levels")
+    public PageResponse<LevelSummary> listCompanyLevels(
+            @PathVariable String slug,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer limit) {
+        log.debug("GET /api/v1/companies/{}/levels cursor={} limit={}", slug, cursor, limit);
+        return companyService.listCompanyLevels(slug, cursor, limit);
     }
 
     /**
