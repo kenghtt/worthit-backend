@@ -62,6 +62,13 @@ List endpoints return a `Page<T>` envelope and accept `cursor` + `limit`:
 Path params `{slug}` / `{roleSlug}` / `{citySlug}` use the slug rules in
 `database-spec.md` §1. They must match the UI's `slug()` output exactly.
 
+### Internal IDs (never exposed)
+
+Public API responses **must not** include internal database primary keys (e.g.
+`experience.id`). Experience payloads (§2.4, §4.1) identify rows only via their
+expanded natural fields (company/role/location slugs and names, timestamps, etc.).
+Sorting and cursor tiebreakers may use `id` server-side but it is never serialized.
+
 ---
 
 ## 2. Companies
@@ -173,7 +180,8 @@ tiebreaker), restricted to `published` experiences. Each item **mirrors the
 field names: field keys come from the global `snake_case` Jackson strategy
 (e.g. `worth_it_score`, `stress_level`, `wish_knew`, `created_at`), and the
 foreign keys are expanded into their natural identifiers (company/role slug +
-name, location slug/city/state, level name). `id` is the numeric experience id.
+name, location slug/city/state, level name). Internal DB primary keys are **not**
+included (see §1 "Internal IDs").
 
 `employment_status` is the DB enum value — one of `current` / `past` (note:
 `past`, not `former`). These fields are nullable and serialize as `null` when
@@ -184,7 +192,6 @@ unset: `level_name`, `years_at_company`, `hours_per_week`, `why_stay`,
 {
   "items": [
     {
-      "id": 1,
       "company_slug": "amazon",
       "company_name": "Amazon",
       "role_slug": "software-engineer",
@@ -260,7 +267,7 @@ Used by: homepage / global search bar company typeahead.
 
 ---
 
-## 3. Locations
+## 3. Locations 
 
 ### 3.1 List / search locations ✅
 `GET /api/v1/locations` 
@@ -317,9 +324,9 @@ Used by: location detail page.
 
 ---
 
-## 4. Submit an experience (write path)
+## 4. Submit an experience (write path)  ✅
 
-### 4.1 Create experience
+### 4.1 Create experience ✅
 `POST /api/v1/experiences`
 
 Creates a new experience. The UI's multi-step form
@@ -373,8 +380,8 @@ Mapping notes:
 - `stressLevel`, `worthItScore` within `0.0–10.0`.
 - `employmentStatus` ∈ {`current`, `former`}.
 
-**Response:** `201 Created` with the created `Experience` (same shape as §2.4),
-or `400` with validation `details`.
+**Response:** `201 Created` with the created experience (same shape as §2.4, without
+internal DB ids — see §1 "Internal IDs"), or `400` with validation `details`.
 
 New experiences are created with `status = pending` (see `database-spec.md` §9)
 and therefore do **not** appear in read endpoints until published/moderated.

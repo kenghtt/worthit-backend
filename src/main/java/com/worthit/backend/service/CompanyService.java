@@ -9,7 +9,6 @@ import com.worthit.backend.entity.Company;
 import com.worthit.backend.entity.CompanyRole;
 import com.worthit.backend.entity.Experience;
 import com.worthit.backend.entity.ExperienceStatus;
-import com.worthit.backend.entity.Location;
 import com.worthit.backend.entity.Role;
 import com.worthit.backend.exception.ResourceNotFoundException;
 import com.worthit.backend.repository.CompanyRepository;
@@ -250,42 +249,10 @@ public class CompanyService {
                 .stream()
                 .filter(e -> citySlug == null || citySlug.equalsIgnoreCase(e.getLocation().getSlug()))
                 .sorted(newestFirst)
-                .map(this::toExperienceSummary)
+                .map(ExperienceSummary::from)
                 .toList();
 
         return paginate(all, cursor, pageSize);
-    }
-
-    private ExperienceSummary toExperienceSummary(Experience e) {
-        Location loc = e.getLocation();
-        String levelName = e.getLevelName() != null ? e.getLevelName()
-                : (e.getLevel() != null ? e.getLevel().getName() : null);
-        return new ExperienceSummary(
-                e.getId(),
-                e.getCompany().getSlug(),
-                e.getCompany().getName(),
-                e.getRole().getSlug(),
-                e.getRole().getName(),
-                loc.getSlug(),
-                loc.getCity(),
-                loc.getState(),
-                levelName,
-                e.getEmploymentStatus(),
-                e.getYearsExperience(),
-                e.getYearsAtCompany(),
-                e.getBaseSalary(),
-                e.getBonus(),
-                e.getStock(),
-                e.getSigningBonus(),
-                e.getCompensationYear(),
-                e.getStressLevel(),
-                e.getHoursPerWeek(),
-                e.getWorthItScore(),
-                e.getWhyStay(),
-                e.getWhyLeave(),
-                e.getWishKnew(),
-                e.getCreatedAt()
-        );
     }
 
     private CompanySummary toSummary(Company c, CompanyStatsProjection stats) {
