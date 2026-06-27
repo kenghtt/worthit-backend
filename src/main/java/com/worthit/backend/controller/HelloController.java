@@ -8,12 +8,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 /**
- * Simple hello/health endpoint for the WorthIt backend starter.
+ * Liveness probe for the WorthIt backend (see {@code api-endpoints.md} §6.1).
  *
- * Exposes:
- *  - GET /api/hello : returns a small JSON payload, useful as a smoke test and a health probe.
- *
- * TODO(worthIt): replace or supplement with real domain endpoints (this is just a starter sanity check).
+ * <p>{@code GET /api/hello} returns a small JSON payload confirming the JVM and Spring context
+ * are up. Does not verify database connectivity — suitable for smoke tests and container
+ * liveness probes, not deep readiness checks.</p>
  */
 @RestController
 @RequestMapping("/api")

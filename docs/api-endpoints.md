@@ -20,9 +20,9 @@ Companion docs:
 - **Base path:** all endpoints are under `/api/v1`.
 - **Base URL (dev):** `http://localhost:8080` (UI reads `VITE_API_BASE_URL`).
 - **Content type:** `application/json` for requests and responses.
-- **Auth:** read endpoints are public; the submit endpoint may require a JWT
-  (see §7). Security is wired but currently disabled
-  (`security.auth.enabled=false`).
+- **Auth:** **all endpoints are public** — no JWT or login required (see §7).
+  JWT infrastructure is wired but disabled (`security.auth.enabled=false`); auth
+  policy will be defined and enforced in a later phase.
 - **Errors:** every error returns the shared envelope produced by
   `GlobalExceptionHandler` / `ApiErrorResponse`:
 
@@ -408,47 +408,85 @@ company slug does not exist. Accepts optional `cursor` + `limit` (see §1).
 
 ---
 
-## 6. Health / hello
+## 6. Health / hello ✅
 
-Already implemented by `HelloController` (starter). Keep for readiness checks:
+Liveness probe for deploy scripts, load balancers, and local smoke tests. Implemented by
+`HelloController`.
 
-- `GET /hello` (or `/api/hello`) → simple liveness string.
+### 6.1 Liveness
+`GET /api/hello`
+
+Confirms the JVM and Spring context are up. Does **not** verify database connectivity —
+use this for **liveness** (restart if the process is dead), not deep **readiness** (whether
+the app can serve DB-backed traffic). A separate readiness probe (e.g. DB ping or
+`/actuator/health`) can be added later if needed.
+
+Auth: public (see §7). Returns `200 OK` with a small JSON payload:
+
+```json
+{
+  "app": "worthit-backend",
+  "status": "ok",
+  "message": "Hello from WorthIt backend"
+}
+```
+
+> This path lives under `/api/hello` (starter), not `/api/v1`, so probes should hit
+> `http://localhost:8080/api/hello` directly.
+
+Used by: CI smoke tests, local dev sanity checks, container liveness probes.
 
 ---
 
 ## 7. Authentication & security notes
 
-- Security is wired via `spring-boot-starter-oauth2-resource-server` but
-  **disabled** by default (`security.auth.enabled=false`,
-  `SecurityConfigLocal`). All endpoints are open while disabled.
-- When auth is enabled (`security.auth.enabled=true`), configure
-  `security.jwt.issuer`, `security.jwt.jwks-uri`, `security.jwt.expected-audience`
-  (Supabase/Auth0/Cognito — TBD) in `application.properties`.
-- Suggested policy once auth is on:
-  - **Public (no token):** all `GET` read endpoints in §2, §3, §5, §6.
-  - **Authenticated (valid JWT):** `POST /api/v1/experiences` (§4), so
-    submissions are attributable / rate-limitable. Until then it can stay public.
-- CORS: allowed origins come from `app.security.cors.allowed-origins`
-  (currently `http://localhost:3000,http://localhost:5173`). Add the deployed UI
-  origin per environment.
-- Unauthorized/forbidden requests return the standard error envelope with
-  status `401` / `403` (handled in `GlobalExceptionHandler`).
+### Current (all public)
+
+All endpoints in this document — including `POST /api/v1/experiences` (§4) —
+are **public**. No token is required. This is the active behavior while
+`security.auth.enabled=false` (the default; `SecurityConfigLocal` permits every
+request).
+
+CORS allowed origins come from `app.security.cors.allowed-origins` (currently
+`http://localhost:3000,http://localhost:5173`). Add the deployed UI origin per
+environment.
+
+### Future (TBD)
+
+JWT validation is scaffolded via `spring-boot-starter-oauth2-resource-server`
+(`SecurityConfig`) but **not enabled yet**. When auth is turned on in a later
+phase, configure `security.jwt.issuer`, `security.jwt.jwks-uri`, and
+`security.jwt.expected-audience` (Supabase/Auth0/Cognito — TBD) and update
+`SecurityConfig` with the chosen public vs authenticated route rules. Likely
+candidates for protection: `POST /api/v1/experiences` (submissions attributable /
+rate-limitable); read endpoints may stay public — exact policy TBD.
+
+> **Note:** `application-prod.properties` sets `security.auth.enabled=true`, but
+> prod auth is not wired end-to-end yet. Do not enable the prod security profile
+> until JWT settings and route rules are finalized.
+
+Unauthorized/forbidden responses will use status `401` / `403` once auth is
+enabled (via `GlobalExceptionHandler` for controller-thrown errors; Spring
+Security filter chain for missing/invalid tokens).
 
 ---
 
 ## 8. Endpoint summary
 
-| Method | Path                                                        | Auth (when on) | UI consumer                       |
-|--------|-------------------------------------------------------------|----------------|-----------------------------------|
-| GET    | `/api/v1/companies`                                         | public         | companies list, home search       |
-| GET    | `/api/v1/companies/{slug}`                                  | public         | company detail                    |
-| GET    | `/api/v1/companies/search`                                  | public         | search bar typeahead              |
-| GET    | `/api/v1/companies/{slug}/roles`                            | public         | company detail (roles)            |
-| GET    | `/api/v1/companies/{slug}/roles/{roleSlug}/experiences`     | public         | experiences list + modal          |
-| GET    | `/api/v1/locations`                                         | public         | locations list                    |
-| GET    | `/api/v1/locations/{slug}`                                  | public         | location detail                   |
-| GET    | `/api/v1/locations/{slug}/companies`                        | public         | location detail (companies)       |
-| GET    | `/api/v1/roles`                                             | public         | submit form (role picker)         |
-| GET    | `/api/v1/companies/{slug}/levels`                           | public         | submit form (level picker)        |
-| POST   | `/api/v1/experiences`                                       | authenticated  | submit experience form            |
-| GET    | `/hello`                                                    | public         | health check                      |
+All endpoints are **public** today (see §7). Auth requirements below reflect
+the current state, not a future policy.
+
+| Method | Path                                                        | Auth   | UI consumer                       |
+|--------|-------------------------------------------------------------|--------|-----------------------------------|
+| GET    | `/api/v1/companies`                                         | public | companies list, home search       |
+| GET    | `/api/v1/companies/{slug}`                                  | public | company detail                    |
+| GET    | `/api/v1/companies/search`                                  | public | search bar typeahead              |
+| GET    | `/api/v1/companies/{slug}/roles`                            | public | company detail (roles)            |
+| GET    | `/api/v1/companies/{slug}/roles/{roleSlug}/experiences`     | public | experiences list + modal          |
+| GET    | `/api/v1/locations`                                         | public | locations list                    |
+| GET    | `/api/v1/locations/{slug}`                                  | public | location detail                   |
+| GET    | `/api/v1/locations/{slug}/companies`                        | public | location detail (companies)       |
+| GET    | `/api/v1/roles`                                             | public | submit form (role picker)         |
+| GET    | `/api/v1/companies/{slug}/levels`                           | public | submit form (level picker)        |
+| POST   | `/api/v1/experiences`                                       | public | submit experience form            |
+| GET    | `/api/hello`                                                | public | liveness / smoke test             |
