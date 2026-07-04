@@ -64,10 +64,11 @@ public class CompanyService {
     private final LevelRepository levelRepository;
 
     @Transactional(readOnly = true)
-    public PageResponse<CompanySummary> listCompanies(String companySubstring, String industry,
+    public PageResponse<CompanySummary> listCompanies(String companySubstring, Boolean includeZeroExperience, String industry,
                                                       String sort, String order,
                                                       String cursor, Integer limit) {
         int pageSize = normalizeLimit(limit);
+        boolean includeZeroExp = Boolean.TRUE.equals(includeZeroExperience);
 
         Map<Long, CompanyStatsProjection> statsByCompany = experienceRepository
                 .aggregateByCompany(ExperienceStatus.published)
@@ -83,6 +84,7 @@ public class CompanyService {
                 .filter(c -> industryFilter == null
                         || (c.getIndustry() != null && c.getIndustry().equalsIgnoreCase(industryFilter)))
                 .map(c -> toSummary(c, statsByCompany.get(c.getId())))
+                .filter(c -> includeZeroExp || c.experienceCount() > 0)
                 .sorted(comparator(sort, order))
                 .toList();
 

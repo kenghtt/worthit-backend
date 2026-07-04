@@ -33,14 +33,15 @@ public class CompanyController {
     @GetMapping
     public PageResponse<CompanySummary> listCompanies(
             @RequestParam(required = false) String companySubstring,
+            @RequestParam(required = false) Boolean includeZeroExperience,
             @RequestParam(required = false) String industry,
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) String order,
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false) Integer limit) {
-        log.debug("GET /api/v1/companies q={} industry={} sort={} order={} cursor={} limit={}",
-                companySubstring, industry, sort, order, cursor, limit);
-        return companyService.listCompanies(companySubstring, industry, sort, order, cursor, limit);
+        log.debug("GET /api/v1/companies q={} includeZeroExperience={} industry={} sort={} order={} cursor={} limit={}",
+                companySubstring, includeZeroExperience, industry, sort, order, cursor, limit);
+        return companyService.listCompanies(companySubstring, includeZeroExperience, industry, sort, order, cursor, limit);
     }
 
     /**

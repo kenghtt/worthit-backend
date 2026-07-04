@@ -4,6 +4,7 @@ This document specifies the HTTP endpoints the WorthIt backend needs to expose
 so the UI can stop using hardcoded data.
 
 Companion docs:
+- [`frontend-api-guide.md`](./frontend-api-guide.md) — frontend handoff: how to call each endpoint and which UI screens use it.
 - [`database-spec.md`](./database-spec.md) — tables/columns these endpoints read/write.
 - [`worthit/docs/ui-endpoint-usage.md`](../../worthit/docs/ui-endpoint-usage.md) — where each endpoint is consumed in the UI.
 
@@ -81,6 +82,7 @@ Query params (all optional):
 | Param      | Type   | Description                                            |
 |------------|--------|--------------------------------------------------------|
 | `q`        | string | Case-insensitive substring match on company name.      |
+| `includeZeroExperience` | boolean | Include companies with `experienceCount = 0`. Default `false` for browse mode. |
 | `industry` | string | Filter by industry (e.g. `Tech`).                      |
 | `sort`     | string | Sort field (e.g. `name`, `worthScore`, `experiences`). |
 | `order`    | string | `asc` or `desc`.                                       |
@@ -108,6 +110,10 @@ Returns `Page<CompanySummary>`:
 ```
 
 Used by: companies list page, homepage company typeahead/search.
+
+Behavior note:
+- When `includeZeroExperience` is omitted/`false`, the list excludes companies with no published experiences (`experienceCount = 0`) to keep the default browse table focused.
+- When `includeZeroExperience=true`, matching companies are returned regardless of experience count (recommended when the user enters a search query).
 
 ### 2.2 Company detail ✅
 `GET /api/v1/companies/{slug}`

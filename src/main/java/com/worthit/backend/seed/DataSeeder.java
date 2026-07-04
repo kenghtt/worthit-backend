@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
@@ -55,8 +56,27 @@ public class DataSeeder implements ApplicationRunner {
     private final ExperienceRepository experienceRepository;
     private final CompanyRoleRepository companyRoleRepository;
 
-    /** How many experiences to seed per company. */
+    /** How many experiences to seed per company (demo set). */
     private static final int EXPERIENCES_PER_COMPANY = 5;
+
+    /**
+     * Target total published experiences for Amazon after bulk seeding. The generic pass seeds
+     * {@link #EXPERIENCES_PER_COMPANY} first; this top-up adds the rest across all Amazon roles.
+     */
+    private static final int AMAZON_TARGET_EXPERIENCE_COUNT = 125;
+
+    private static final long AMAZON_BULK_SEED = 424_242L;
+
+    /** Amazon office cities used for bulk experience distribution (must exist in {@link #LOCATIONS}). */
+    private static final List<String[]> AMAZON_BULK_LOCATIONS = List.of(
+            new String[]{"Seattle", "WA"},
+            new String[]{"Arlington", "VA"},
+            new String[]{"Austin", "TX"},
+            new String[]{"New York", "NY"},
+            new String[]{"San Francisco", "CA"},
+            new String[]{"Bellevue", "WA"},
+            new String[]{"Culver City", "CA"}
+    );
 
     /**
      * Slugs of the original demo companies that get sample experiences seeded. The much larger
@@ -766,8 +786,9 @@ public class DataSeeder implements ApplicationRunner {
         int levels = seedLevels();
         int companyRoles = seedCompanyRoles();
         int experiences = seedExperiences();
-        log.info("Lookup seed complete. inserted: companies={}, roles={}, locations={}, levels={}, company_roles={}, experiences={}",
-                companies, roles, locations, levels, companyRoles, experiences);
+        int amazonExperiences = seedAmazonBulkExperiences();
+        log.info("Lookup seed complete. inserted: companies={}, roles={}, locations={}, levels={}, company_roles={}, experiences={}, amazon_bulk_experiences={}",
+                companies, roles, locations, levels, companyRoles, experiences, amazonExperiences);
     }
 
     private int seedCompanies() {
@@ -829,17 +850,20 @@ public class DataSeeder implements ApplicationRunner {
             }
         }
 
-        // AI Engineer only at Amazon
+        // Amazon gets every catalog role for richer per-role test data (SWE, EM, PO, ML, etc.).
         Company amazon = companyRepository.findBySlug("amazon").orElse(null);
-        Role aiEngineer = roleRepository.findBySlug("ai-engineer").orElse(null);
-        if (amazon != null && aiEngineer != null &&
-                !companyRoleRepository.existsByCompany_IdAndRole_Id(amazon.getId(), aiEngineer.getId())) {
-            companyRoleRepository.save(CompanyRole.builder()
-                    .company(amazon)
-                    .role(aiEngineer)
-                    .active(true)
-                    .build());
-            inserted++;
+        if (amazon != null) {
+            for (String[] row : ROLES) {
+                Role role = roleRepository.findBySlug(SlugUtil.slugify(row[0])).orElse(null);
+                if (role == null) continue;
+                if (companyRoleRepository.existsByCompany_IdAndRole_Id(amazon.getId(), role.getId())) continue;
+                companyRoleRepository.save(CompanyRole.builder()
+                        .company(amazon)
+                        .role(role)
+                        .active(true)
+                        .build());
+                inserted++;
+            }
         }
 
         // Network Engineer only at Google
@@ -942,6 +966,160 @@ public class DataSeeder implements ApplicationRunner {
             }
         }
         return inserted;
+    }
+
+    /**
+     * Top up Amazon with {@value #AMAZON_TARGET_EXPERIENCE_COUNT} total published experiences,
+     * spread across every role linked to the company. Idempotent: only inserts until the target
+     * count is reached (safe on every boot).
+     */
+    private int seedAmazonBulkExperiences() {
+        Company amazon = companyRepository.findBySlug("amazon").orElse(null);
+        if (amazon == null) {
+            return 0;
+        }
+
+        long existing = experienceRepository.countByCompany_Id(amazon.getId());
+        if (existing >= AMAZON_TARGET_EXPERIENCE_COUNT) {
+            return 0;
+        }
+
+        List<CompanyRole> companyRoles = companyRoleRepository.findActiveWithRoleByCompanyId(amazon.getId());
+        if (companyRoles.isEmpty()) {
+            log.warn("Skipping Amazon bulk experience seed — no company roles linked.");
+            return 0;
+        }
+
+        List<Level> levels = levelRepository.findByCompany_IdOrderByNormalizedRankAsc(amazon.getId());
+        List<Location> locations = resolveAmazonBulkLocations();
+        if (locations.isEmpty()) {
+            log.warn("Skipping Amazon bulk experience seed — no Amazon office locations found.");
+            return 0;
+        }
+
+        Random rng = new Random(AMAZON_BULK_SEED);
+        int toAdd = (int) (AMAZON_TARGET_EXPERIENCE_COUNT - existing);
+        int inserted = 0;
+
+        for (int i = 0; i < toAdd; i++) {
+            Role role = companyRoles.get(i % companyRoles.size()).getRole();
+            Location location = locations.get(rng.nextInt(locations.size()));
+            Level level = pickAmazonLevel(role, levels, rng);
+            int[] comp = amazonCompRange(role.getSlug(), rng);
+
+            short years = (short) (1 + rng.nextInt(18));
+            short yearsAtCo = (short) Math.min(years, 1 + rng.nextInt(10));
+            int base = comp[0] + rng.nextInt(comp[1]);
+            int bonus = rng.nextInt(comp[2]);
+            int stock = rng.nextInt(comp[3]);
+            int signing = rng.nextInt(comp[4]);
+            short hours = (short) (38 + rng.nextInt(35));
+            BigDecimal stress = BigDecimal.valueOf(25 + rng.nextInt(65), 1);
+            BigDecimal worth = BigDecimal.valueOf(25 + rng.nextInt(76), 1).setScale(1, RoundingMode.HALF_UP);
+            EmploymentStatus emp = rng.nextInt(100) < 72 ? EmploymentStatus.current : EmploymentStatus.past;
+
+            String[] narrative = amazonNarrative(role.getSlug(), rng);
+            experienceRepository.save(Experience.builder()
+                    .company(amazon)
+                    .role(role)
+                    .location(location)
+                    .level(level)
+                    .levelName(level == null ? null : level.getName())
+                    .employmentStatus(emp)
+                    .yearsExperience(years)
+                    .yearsAtCompany(yearsAtCo)
+                    .baseSalary(base)
+                    .bonus(bonus)
+                    .stock(stock)
+                    .signingBonus(signing)
+                    .compensationYear((short) (2023 + rng.nextInt(3)))
+                    .stressLevel(stress)
+                    .hoursPerWeek(hours)
+                    .worthItScore(worth)
+                    .whyStay(narrative[0])
+                    .whyLeave(narrative[1])
+                    .wishKnew(narrative[2])
+                    .status(ExperienceStatus.published)
+                    .build());
+            inserted++;
+        }
+
+        log.info("Amazon bulk experience seed added {} rows (total now {})", inserted, existing + inserted);
+        return inserted;
+    }
+
+    private List<Location> resolveAmazonBulkLocations() {
+        List<Location> resolved = new ArrayList<>();
+        for (String[] row : AMAZON_BULK_LOCATIONS) {
+            locationRepository.findByCityAndState(row[0], row[1]).ifPresent(resolved::add);
+        }
+        return resolved;
+    }
+
+    /**
+     * Picks an Amazon level appropriate to the role. IC roles use the SDE ladder; management
+     * roles skew senior; product/network may have no linked level row.
+     */
+    private static Level pickAmazonLevel(Role role, List<Level> levels, Random rng) {
+        if (levels.isEmpty()) {
+            return null;
+        }
+        return switch (role.getSlug()) {
+            case "software-engineer", "ml-engineer", "network-engineer" ->
+                    levels.get(rng.nextInt(Math.min(4, levels.size())));
+            case "engineering-manager" ->
+                    levels.get(Math.min(2, levels.size() - 1));
+            case "director-of-engineering" ->
+                    levels.get(Math.min(3, levels.size() - 1));
+            case "product-owner" -> null;
+            default -> levels.get(rng.nextInt(levels.size()));
+        };
+    }
+
+    /** Returns {@code {baseMin, baseSpan, bonusMax, stockMax, signingMax}} tuned per role. */
+    private static int[] amazonCompRange(String roleSlug, Random rng) {
+        return switch (roleSlug) {
+            case "ml-engineer" -> new int[]{145_000, 210_000, 80_000, 350_000, 75_000};
+            case "engineering-manager" -> new int[]{185_000, 220_000, 90_000, 200_000, 50_000};
+            case "director-of-engineering" -> new int[]{260_000, 260_000, 120_000, 400_000, 80_000};
+            case "product-owner" -> new int[]{125_000, 155_000, 55_000, 80_000, 40_000};
+            case "network-engineer" -> new int[]{110_000, 140_000, 45_000, 60_000, 35_000};
+            default -> new int[]{120_000, 180_000, 60_000, 280_000, 50_000};
+        };
+    }
+
+    private static String[] amazonNarrative(String roleSlug, Random rng) {
+        String[][] templates = switch (roleSlug) {
+            case "software-engineer" -> new String[][]{
+                    {"Strong ownership culture and solid RSU refreshes.", "On-call load got heavy during peak season.", "Ask about team-specific operational load before joining."},
+                    {"Great learning curve on large-scale systems.", "Promotion bar feels opaque at higher levels.", "LP interviews are real — prepare concrete ownership stories."},
+                    {"Comp is competitive for the market.", "Work-life balance varies a lot by org.", "Two-pizza team size is not universal — verify team scope."}
+            };
+            case "ml-engineer" -> new String[][]{
+                    {"Interesting ML infra problems at scale.", "Research-to-prod timeline can be slow.", "Confirm whether the role is science-heavy or eng-heavy."},
+                    {"Access to huge datasets and tooling.", "Model deployment ownership spans many teams.", "Ask how model quality vs velocity is prioritized."}
+            };
+            case "engineering-manager" -> new String[][]{
+                    {"High trust from leadership when you deliver.", "Hard to protect team from org churn.", "Headcount planning is tighter than it looks in interviews."},
+                    {"Good comp and scope for people managers.", "Calendar load makes deep work rare.", "Clarify how much coding the EM role expects."}
+            };
+            case "director-of-engineering" -> new String[][]{
+                    {"Big scope and influence across multiple teams.", "Political overhead increases quickly.", "Director roles differ wildly — validate P&L vs pure eng."},
+                    {"Strong comp at this level.", "Reorgs can reset priorities overnight.", "Understand which VP org you're landing in."}
+            };
+            case "product-owner" -> new String[][]{
+                    {"Close partnership with eng on roadmap.", "Documentation and process overhead.", "Product roles sit in different orgs — check reporting line."},
+                    {"Customer-obsessed culture shows up in reviews.", "Stakeholder alignment takes real time.", "Ask how much technical depth PMs are expected to have."}
+            };
+            case "network-engineer" -> new String[][]{
+                    {"Massive network footprint to learn on.", "Incidents can be high pressure.", "On-call expectations should be spelled out day one."},
+                    {"Stable team with deep domain experts.", "Change windows often mean late nights.", "Automation vs manual ops balance varies by team."}
+            };
+            default -> new String[][]{
+                    {"Solid overall package.", "Org-dependent downsides.", "Do extra diligence on the specific team."}
+            };
+        };
+        return templates[rng.nextInt(templates.length)];
     }
 
     private int seedLevels() {
