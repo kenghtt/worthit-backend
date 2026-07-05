@@ -169,12 +169,19 @@ GET /api/v1/companies
       "experienceCount": 5,
       "roleCount": 3,
       "avgWorthScore": 7.4,
-      "avgStress": 6.8
+      "avgStress": 6.8,
+      "avgHoursPerWeek": 46.5,
+      "avgTotalComp": 185000
     }
   ],
   "next_cursor": null
 }
 ```
+
+`avgHoursPerWeek` (mean reported weekly hours, one decimal, `null` if none) and
+`avgTotalComp` (mean of `base_salary + bonus + stock + signing_bonus` per
+experience, whole USD, `null` when no published experiences) populate the
+companies table's **Hours/week** and **Median Comp** columns.
 
 **UI:** `CompaniesPage`, Home featured companies.
 

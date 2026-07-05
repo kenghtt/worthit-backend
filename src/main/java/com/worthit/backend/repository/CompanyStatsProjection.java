@@ -17,4 +17,10 @@ public interface CompanyStatsProjection {
     BigDecimal getAvgWorthScore();
 
     BigDecimal getAvgStress();
+
+    /** Average weekly working hours across experiences ({@code null} if none report hours). */
+    BigDecimal getAvgHoursPerWeek();
+
+    /** Average total compensation (base + bonus + stock + signing bonus). */
+    BigDecimal getAvgTotalComp();
 }

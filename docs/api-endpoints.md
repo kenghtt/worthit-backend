@@ -102,12 +102,20 @@ Returns `Page<CompanySummary>`:
       "experienceCount": 5,
       "roleCount": 3,
       "avgWorthScore": 7.4,
-      "avgStress": 6.8
+      "avgStress": 6.8,
+      "avgHoursPerWeek": 46.5,
+      "avgTotalComp": 185000
     }
   ],
   "next_cursor": null
 }
 ```
+
+`avgHoursPerWeek` is the mean of reported weekly hours (one decimal, `null` if
+none report hours). `avgTotalComp` is the mean **total** compensation per
+experience — the sum of `base_salary + bonus + stock + signing_bonus` — rounded
+to whole USD (`null` when the company has no published experiences). These power
+the companies table's *Hours/week* and *Median Comp* columns.
 
 Used by: companies list page, homepage company typeahead/search.
 
