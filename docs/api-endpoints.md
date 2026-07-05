@@ -278,7 +278,14 @@ Used by: homepage / global search bar company typeahead.
 ### 3.1 List / search locations ✅
 `GET /api/v1/locations` 
 
-Query params: `q` (city name substring), `cursor`, `limit`.
+Query params (all optional):
+
+| Param      | Type   | Description                                            |
+|------------|--------|--------------------------------------------------------|
+| `q`        | string | Case-insensitive substring match on city name.         |
+| `includeZeroExperience` | boolean | Include locations with `experienceCount = 0`. Default `false` for browse mode. |
+| `cursor`   | string | Pagination cursor.                                     |
+| `limit`    | int    | Page size.                                             |
 
 Returns `Page<LocationSummary>`:
 
@@ -298,6 +305,10 @@ Returns `Page<LocationSummary>`:
   "next_cursor": null
 }
 ```
+
+Behavior note:
+- When `includeZeroExperience` is omitted/`false`, the list excludes cities with no published experiences (`experienceCount = 0`) to keep the default browse table focused.
+- When `includeZeroExperience=true`, matching cities are returned regardless of experience count (recommended when the user enters a search query).
 
 ### 3.2 Location detail ✅
 `GET /api/v1/locations/{slug}`

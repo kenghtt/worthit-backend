@@ -317,12 +317,13 @@ GET /api/v1/companies/{slug}/roles/{roleSlug}/experiences?city=&cursor=&limit=
 from **published** experiences.
 
 ```
-GET /api/v1/locations?q=&cursor=&limit=
+GET /api/v1/locations?q=&includeZeroExperience=&cursor=&limit=
 ```
 
 | Query param | Type | Description |
 |-------------|------|-------------|
 | `q` | string | Case-insensitive substring on city name |
+| `includeZeroExperience` | boolean | Include cities with `experienceCount = 0`. Default `false` for browse mode; set `true` when user is actively searching. |
 
 **Response:** `Page<LocationSummary>`
 
@@ -346,6 +347,10 @@ GET /api/v1/locations?q=&cursor=&limit=
 **UI:** `LocationsPage`, Home featured locations.
 
 **Client:** `listLocations(params)`.
+
+**Recommended usage:**
+- Default browse list (no search text): send `includeZeroExperience=false` so the table does not get flooded by cities without published experiences.
+- Search mode (search text present): send `includeZeroExperience=true` so manually searched cities can still appear even when their current `experienceCount` is `0`.
 
 ---
 

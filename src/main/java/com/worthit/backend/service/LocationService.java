@@ -49,14 +49,17 @@ public class LocationService {
      * Lists / searches locations, each with per-city aggregate stats
      * (see {@code api-endpoints.md} §3.1). The optional {@code q} is a case-insensitive substring
      * match on the city name; stats — experience count, distinct company count, and average
-     * worth/stress — are computed from {@code published} experiences. Locations with no published
-     * experiences are still listed, with {@code 0} counts and {@code null} averages.
+     * worth/stress — are computed from {@code published} experiences. By default, locations with no
+     * published experiences are excluded; pass {@code includeZeroExperience=true} to list them
+     * (with {@code 0} counts and {@code null} averages).
      *
      * <p>Results are city-name sorted (slug tiebreaker) and cursor-paged.</p>
      */
     @Transactional(readOnly = true)
-    public PageResponse<LocationSummary> listLocations(String q, String cursor, Integer limit) {
+    public PageResponse<LocationSummary> listLocations(String q, Boolean includeZeroExperience,
+                                                       String cursor, Integer limit) {
         int pageSize = normalizeLimit(limit);
+        boolean includeZeroExp = Boolean.TRUE.equals(includeZeroExperience);
 
         Map<Long, LocationStatsProjection> statsByLocation = experienceRepository
                 .aggregateByLocation(ExperienceStatus.published)
@@ -69,6 +72,7 @@ public class LocationService {
                 .filter(Location::isActive)
                 .filter(l -> qLower == null || l.getCity().toLowerCase(Locale.ROOT).contains(qLower))
                 .map(l -> toSummary(l, statsByLocation.get(l.getId())))
+                .filter(l -> includeZeroExp || l.experienceCount() > 0)
                 .sorted(Comparator
                         .comparing((LocationSummary l) -> l.city().toLowerCase(Locale.ROOT))
                         .thenComparing(LocationSummary::slug))

@@ -31,10 +31,12 @@ public class LocationController {
     @GetMapping
     public PageResponse<LocationSummary> listLocations(
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) Boolean includeZeroExperience,
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false) Integer limit) {
-        log.debug("GET /api/v1/locations q={} cursor={} limit={}", q, cursor, limit);
-        return locationService.listLocations(q, cursor, limit);
+        log.debug("GET /api/v1/locations q={} includeZeroExperience={} cursor={} limit={}",
+                q, includeZeroExperience, cursor, limit);
+        return locationService.listLocations(q, includeZeroExperience, cursor, limit);
     }
 
     /**
