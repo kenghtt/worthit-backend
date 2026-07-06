@@ -121,7 +121,7 @@ Common statuses: `404` missing slug, `400` validation, `201` created experience.
 | GET | `/api/v1/companies/search` | Lightweight company typeahead | Home search bar ✅ live |
 | GET | `/api/v1/companies/{slug}` | Company profile (no stats) | Company detail header |
 | GET | `/api/v1/companies/{slug}/roles` | Roles at company + per-role stats | Company detail role cards |
-| GET | `/api/v1/companies/{slug}/roles/{roleSlug}/experiences` | Published experiences for company + role | Experiences list, experience modal |
+| GET | `/api/v1/experiences` | Published experiences filtered by company + role | Experiences list, experience modal |
 | GET | `/api/v1/locations` | List/search cities with stats | Locations list, Home |
 | GET | `/api/v1/locations/{slug}` | Single city stats | Location detail header |
 | GET | `/api/v1/locations/{slug}/companies` | Companies with experiences in that city | Location detail company list |
@@ -284,11 +284,16 @@ the experiences list and the individual experience modal (pass an item from the 
 separate detail endpoint).
 
 ```
-GET /api/v1/companies/{slug}/roles/{roleSlug}/experiences?city=&cursor=&limit=
+GET /api/v1/experiences?company=&role=&city=&cursor=&limit=
 ```
+
+This endpoint lives on the experiences resource; company and role are passed as
+query params (slugs) rather than path segments.
 
 | Query param | Type | Description |
 |-------------|------|-------------|
+| `company` | string | Company **slug** (e.g. `amazon`) |
+| `role` | string | Role **slug** (e.g. `software-engineer`) |
 | `city` | string | Optional location **slug** filter (e.g. `seattle-wa`) |
 | `cursor`, `limit` | | Pagination; sorted newest first |
 
@@ -299,7 +304,7 @@ GET /api/v1/companies/{slug}/roles/{roleSlug}/experiences?city=&cursor=&limit=
 
 **UI:** `ExperiencesList.jsx`, `IndividualExperienceModal`, `RoleDetail.jsx`.
 
-**Client:** `listCompanyRoleExperiences(slug, roleSlug, params)`.
+**Client:** `listExperiences(params)` in `experienceApi.js` (e.g. `listExperiences({company, role, city})`).
 
 **Field mapping for existing components** (if not updating component prop names):
 
@@ -550,7 +555,7 @@ Note: this path is `/api/hello`, not under `/api/v1`.
 
 1. Companies list → `GET /api/v1/companies`
 2. Company detail + roles → `{slug}` + `{slug}/roles`
-3. Experiences list + modal → `{slug}/roles/{roleSlug}/experiences`
+3. Experiences list + modal → `/experiences?company=&role=`
 4. Locations list + detail → `/locations`, `/locations/{slug}`, `/locations/{slug}/companies`
 5. Home featured sections
 6. Submit form → `POST /api/v1/experiences` + `/roles` + `/levels` pickers

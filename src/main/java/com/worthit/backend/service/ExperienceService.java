@@ -2,6 +2,7 @@ package com.worthit.backend.service;
 
 import com.worthit.backend.dto.CreateExperienceRequest;
 import com.worthit.backend.dto.ExperienceSummary;
+import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.entity.Company;
 import com.worthit.backend.entity.CompanyRole;
 import com.worthit.backend.entity.EmploymentStatus;
@@ -16,11 +17,16 @@ import com.worthit.backend.repository.ExperienceRepository;
 import com.worthit.backend.repository.LevelRepository;
 import com.worthit.backend.repository.LocationRepository;
 import com.worthit.backend.repository.RoleRepository;
+import com.worthit.backend.exception.ResourceNotFoundException;
 import com.worthit.backend.util.SlugUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -36,12 +42,62 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class ExperienceService {
 
+    /** Default page size when {@code limit} is omitted (see §1). */
+    static final int DEFAULT_LIMIT = 20;
+    /** Maximum allowed page size (see §1). */
+    static final int MAX_LIMIT = 50;
+
     private final CompanyRepository companyRepository;
     private final RoleRepository roleRepository;
     private final LocationRepository locationRepository;
     private final LevelRepository levelRepository;
     private final CompanyRoleRepository companyRoleRepository;
     private final ExperienceRepository experienceRepository;
+
+    /**
+     * Lists the {@code published} experiences for a company + role (see {@code api-endpoints.md}
+     * §2.4), newest first, optionally filtered to a single city (by location slug). Each item
+     * mirrors the {@code experience} DB columns (see {@link ExperienceSummary}).
+     *
+     * <p>Company and role are supplied as slugs; the matching rows are sorted and paged in
+     * memory.</p>
+     *
+     * @throws ResourceNotFoundException if no active company or role with the given slug exists,
+     *                                   or the role is not offered at the company
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<ExperienceSummary> listExperiences(String slug, String roleSlug, String city,
+                                                           String cursor, Integer limit) {
+        Company company = companyRepository.findBySlug(slug)
+                .filter(Company::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException("Company not found: " + slug));
+        Role role = roleRepository.findBySlug(roleSlug)
+                .filter(Role::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + roleSlug));
+        if (!companyRoleRepository.existsByCompany_IdAndRole_Id(company.getId(), role.getId())) {
+            throw new ResourceNotFoundException(
+                    "Role not offered at company: " + slug + "/" + roleSlug);
+        }
+
+        int pageSize = normalizeLimit(limit);
+        String citySlug = (city == null || city.isBlank()) ? null : city.trim();
+
+        // Newest first, with id as a stable tiebreaker so cursor paging is deterministic.
+        Comparator<Experience> newestFirst = Comparator
+                .comparing(Experience::getCreatedAt)
+                .thenComparing(Experience::getId)
+                .reversed();
+
+        List<ExperienceSummary> all = experienceRepository
+                .findForCompanyRole(company.getId(), role.getId(), ExperienceStatus.published)
+                .stream()
+                .filter(e -> citySlug == null || citySlug.equalsIgnoreCase(e.getLocation().getSlug()))
+                .sorted(newestFirst)
+                .map(ExperienceSummary::from)
+                .toList();
+
+        return paginate(all, cursor, pageSize);
+    }
 
     /**
      * Creates a new {@code pending} experience from the submit form (see {@code api-endpoints.md}
@@ -160,6 +216,49 @@ public class ExperienceService {
             default -> throw new IllegalArgumentException(
                     "employmentStatus must be one of: current, former");
         };
+    }
+
+    private static int normalizeLimit(Integer limit) {
+        if (limit == null || limit <= 0) {
+            return DEFAULT_LIMIT;
+        }
+        return Math.min(limit, MAX_LIMIT);
+    }
+
+    /**
+     * Applies offset cursor pagination to an already filtered/sorted list: slices out the page
+     * starting at the decoded {@code cursor} offset and computes the {@code next_cursor}
+     * (see {@code api-endpoints.md} §1 "Pagination"). An out-of-range/exhausted offset yields an
+     * empty page with a {@code null} cursor.
+     */
+    private static <T> PageResponse<T> paginate(List<T> all, String cursor, int pageSize) {
+        int offset = decodeCursor(cursor);
+        if (offset < 0 || offset >= all.size()) {
+            return new PageResponse<>(List.of(), null);
+        }
+        int end = Math.min(offset + pageSize, all.size());
+        String nextCursor = end < all.size() ? encodeCursor(end) : null;
+        return new PageResponse<>(all.subList(offset, end), nextCursor);
+    }
+
+    private static String encodeCursor(int offset) {
+        return Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(("o:" + offset).getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static int decodeCursor(String cursor) {
+        if (cursor == null || cursor.isBlank()) {
+            return 0;
+        }
+        try {
+            String decoded = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+            if (decoded.startsWith("o:")) {
+                return Integer.parseInt(decoded.substring(2));
+            }
+        } catch (IllegalArgumentException ignored) {
+            // Malformed cursor — fall through to treat as start.
+        }
+        return 0;
     }
 
     private static boolean isPresent(String value) {

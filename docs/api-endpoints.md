@@ -178,15 +178,21 @@ whole USD, where `baseSalaryAverage` is the mean of the role's base salaries
 Used by: company detail page (role cards).
 
 ### 2.4 Experiences for a company + role ✅
-`GET /api/v1/companies/{slug}/roles/{roleSlug}/experiences`
+`GET /api/v1/experiences`
+
+> This endpoint is defined on the experiences resource (`ExperienceController`).
+> Company and role are supplied as query params (filters) rather than path
+> segments.
 
 Query params (all optional):
 
-| Param    | Type   | Description                                  |
-|----------|--------|----------------------------------------------|
-| `city`   | string | City **slug** filter (e.g. `seattle-wa`).    |
-| `cursor` | string | Pagination cursor.                           |
-| `limit`  | int    | Page size (default `20`, max `50`).          |
+| Param     | Type   | Description                                  |
+|-----------|--------|----------------------------------------------|
+| `company` | string | Company **slug** (e.g. `amazon`).            |
+| `role`    | string | Role **slug** (e.g. `software-engineer`).    |
+| `city`    | string | City **slug** filter (e.g. `seattle-wa`).    |
+| `cursor`  | string | Pagination cursor.                           |
+| `limit`   | int    | Page size (default `20`, max `50`).          |
 
 Returns `Page<ExperienceSummary>`, newest first (`created_at` desc, `id` desc
 tiebreaker), restricted to `published` experiences. Each item **mirrors the
@@ -235,9 +241,10 @@ unset: `level_name`, `years_at_company`, `hours_per_week`, `why_stay`,
 }
 ```
 
-> The role list / role slug comes from §2.3. `404` if the company slug or role
-> slug does not exist, or if the role is not offered at the company (no
-> `company_role` link); an unknown `city` slug yields an empty page (not a 404).
+> The role list / role slug comes from §2.3, passed here as the `role` query
+> param. `404` if the `company` slug or `role` slug does not exist, or if the
+> role is not offered at the company (no `company_role` link); an unknown `city`
+> slug yields an empty page (not a 404).
 
 Used by: experiences list page + individual experience modal.
 
@@ -507,7 +514,7 @@ the current state, not a future policy.
 | GET    | `/api/v1/companies/{slug}`                                  | public | company detail                    |
 | GET    | `/api/v1/companies/search`                                  | public | search bar typeahead              |
 | GET    | `/api/v1/companies/{slug}/roles`                            | public | company detail (roles)            |
-| GET    | `/api/v1/companies/{slug}/roles/{roleSlug}/experiences`     | public | experiences list + modal          |
+| GET    | `/api/v1/experiences`                                       | public | experiences list + modal          |
 | GET    | `/api/v1/locations`                                         | public | locations list                    |
 | GET    | `/api/v1/locations/{slug}`                                  | public | location detail                   |
 | GET    | `/api/v1/locations/{slug}/companies`                        | public | location detail (companies)       |

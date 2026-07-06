@@ -2,7 +2,6 @@ package com.worthit.backend.service;
 
 import com.worthit.backend.dto.CompanyDetail;
 import com.worthit.backend.dto.CompanySummary;
-import com.worthit.backend.dto.ExperienceSummary;
 import com.worthit.backend.dto.LevelSummary;
 import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.dto.RoleSummary;
@@ -238,50 +237,6 @@ public class CompanyService {
         // Sum as long to avoid overflow, then divide by count and round to whole USD.
         long sum = experiences.stream().mapToLong(Experience::getBaseSalary).sum();
         return (int) Math.round((double) sum / experiences.size());
-    }
-
-    /**
-     * Lists the {@code published} experiences for a company + role (see {@code api-endpoints.md}
-     * §2.4), newest first, optionally filtered to a single city (by location slug). Each item
-     * mirrors the {@code experience} DB columns (see {@link ExperienceSummary}).
-     *
-     * <p>Like §2.1/§2.3, the matching rows are sorted and paged in memory.</p>
-     *
-     * @throws ResourceNotFoundException if no active company or role with the given slug exists,
-     *                                   or the role is not offered at the company
-     */
-    @Transactional(readOnly = true)
-    public PageResponse<ExperienceSummary> listExperiences(String slug, String roleSlug, String city,
-                                                           String cursor, Integer limit) {
-        Company company = companyRepository.findBySlug(slug)
-                .filter(Company::isActive)
-                .orElseThrow(() -> new ResourceNotFoundException("Company not found: " + slug));
-        Role role = roleRepository.findBySlug(roleSlug)
-                .filter(Role::isActive)
-                .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + roleSlug));
-        if (!companyRoleRepository.existsByCompany_IdAndRole_Id(company.getId(), role.getId())) {
-            throw new ResourceNotFoundException(
-                    "Role not offered at company: " + slug + "/" + roleSlug);
-        }
-
-        int pageSize = normalizeLimit(limit);
-        String citySlug = (city == null || city.isBlank()) ? null : city.trim();
-
-        // Newest first, with id as a stable tiebreaker so cursor paging is deterministic.
-        Comparator<Experience> newestFirst = Comparator
-                .comparing(Experience::getCreatedAt)
-                .thenComparing(Experience::getId)
-                .reversed();
-
-        List<ExperienceSummary> all = experienceRepository
-                .findForCompanyRole(company.getId(), role.getId(), ExperienceStatus.published)
-                .stream()
-                .filter(e -> citySlug == null || citySlug.equalsIgnoreCase(e.getLocation().getSlug()))
-                .sorted(newestFirst)
-                .map(ExperienceSummary::from)
-                .toList();
-
-        return paginate(all, cursor, pageSize);
     }
 
     private CompanySummary toSummary(Company c, CompanyStatsProjection stats) {
