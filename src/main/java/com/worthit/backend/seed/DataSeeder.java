@@ -961,6 +961,7 @@ public class DataSeeder implements ApplicationRunner {
                         .worthItScore(worth)
                         .wishKnew("Seeded test data for " + company.getName() + ".")
                         .status(ExperienceStatus.published)
+                        .active(false)
                         .build());
                 inserted++;
             }
@@ -1040,6 +1041,7 @@ public class DataSeeder implements ApplicationRunner {
                     .whyLeave(narrative[1])
                     .wishKnew(narrative[2])
                     .status(ExperienceStatus.published)
+                    .active(false)
                     .build());
             inserted++;
         }

@@ -119,7 +119,7 @@ public class Experience {
     @Builder.Default
     private ExperienceStatus status = ExperienceStatus.pending;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "boolean default false")
     @Builder.Default
     private boolean active = false;
 
