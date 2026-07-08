@@ -195,7 +195,8 @@ Query params (all optional):
 | `limit`   | int    | Page size (default `20`, max `50`).          |
 
 Returns `Page<ExperienceSummary>`, newest first (`created_at` desc, `id` desc
-tiebreaker), restricted to `published` experiences. Each item **mirrors the
+tiebreaker), restricted to experiences where `status = published` **and**
+`active = true`. Each item **mirrors the
 `experience` DB columns** (see `database-spec.md` §8) rather than the UI's mock
 field names: field keys come from the global `snake_case` Jackson strategy
 (e.g. `worth_it_score`, `stress_level`, `wish_knew`, `created_at`), and the
@@ -415,8 +416,9 @@ Mapping notes:
 **Response:** `201 Created` with the created experience (same shape as §2.4, without
 internal DB ids — see §1 "Internal IDs"), or `400` with validation `details`.
 
-New experiences are created with `status = pending` (see `database-spec.md` §9)
-and therefore do **not** appear in read endpoints until published/moderated.
+New experiences are created with `status = pending` and `active = false` (see
+`database-spec.md` §9) and therefore do **not** appear in read endpoints until
+both status is set to `published` and active is set to `true` by moderation.
 
 ---
 

@@ -70,7 +70,7 @@ public class CompanyService {
         boolean includeZeroExp = Boolean.TRUE.equals(includeZeroExperience);
 
         Map<Long, CompanyStatsProjection> statsByCompany = experienceRepository
-                .aggregateByCompany(ExperienceStatus.published)
+                .aggregateByCompany(ExperienceStatus.published, true)
                 .stream()
                 .collect(Collectors.toMap(CompanyStatsProjection::getCompanyId, Function.identity()));
 
@@ -163,7 +163,7 @@ public class CompanyService {
         int pageSize = normalizeLimit(limit);
 
         Map<Long, List<Experience>> experiencesByRole = experienceRepository
-                .findByCompany_IdAndStatus(company.getId(), ExperienceStatus.published)
+                .findByCompany_IdAndStatusAndActive(company.getId(), ExperienceStatus.published, true)
                 .stream()
                 .collect(Collectors.groupingBy(e -> e.getRole().getId()));
 

@@ -279,7 +279,8 @@ salary/score fields.
 
 ### Experiences for company + role
 
-**Purpose:** Paginated list of **published** experiences for a company/role pair. Powers
+**Purpose:** Paginated list of experiences for a company/role pair that are both
+**published** and **active**. Powers
 the experiences list and the individual experience modal (pass an item from the list — no
 separate detail endpoint).
 
@@ -298,6 +299,8 @@ query params (slugs) rather than path segments.
 | `cursor`, `limit` | | Pagination; sorted newest first |
 
 **Response:** `Page<ExperienceSummary>` (snake_case fields — see [Conventions](#json-field-naming)).
+
+Only experiences with `status=published` and `active=true` are returned.
 
 **Errors:** `404` if company or role slug invalid, or role not linked to company. Unknown
 `city` slug → empty page (not 404).

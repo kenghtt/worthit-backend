@@ -16,7 +16,7 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
      * All experiences for a company in the given status (see {@code api-endpoints.md} §2.3).
      * Loaded so per-role aggregates — including the salary average — can be computed in memory.
      */
-    List<Experience> findByCompany_IdAndStatus(Long companyId, ExperienceStatus status);
+    List<Experience> findByCompany_IdAndStatusAndActive(Long companyId, ExperienceStatus status, boolean active);
 
     /**
      * Experiences for a company + role in the given status (see {@code api-endpoints.md} §2.4),
@@ -29,11 +29,12 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
             join fetch e.role r
             join fetch e.location l
             left join fetch e.level lv
-            where c.id = :companyId and r.id = :roleId and e.status = :status
+            where c.id = :companyId and r.id = :roleId and e.status = :status and e.active = :active
             """)
     List<Experience> findForCompanyRole(@Param("companyId") Long companyId,
                                         @Param("roleId") Long roleId,
-                                        @Param("status") ExperienceStatus status);
+                                        @Param("status") ExperienceStatus status,
+                                        @Param("active") boolean active);
 
     /**
      * Experiences in a location in the given status (see {@code api-endpoints.md} §3.3), with the
@@ -43,10 +44,11 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
     @Query("""
             select e from Experience e
             join fetch e.company c
-            where e.location.id = :locationId and e.status = :status
+            where e.location.id = :locationId and e.status = :status and e.active = :active
             """)
     List<Experience> findForLocation(@Param("locationId") Long locationId,
-                                     @Param("status") ExperienceStatus status);
+                                     @Param("status") ExperienceStatus status,
+                                     @Param("active") boolean active);
 
     /**
      * Per-company aggregate stats over experiences in the given status (see
@@ -61,10 +63,11 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
                    avg(e.hoursPerWeek) as avgHoursPerWeek,
                    avg(e.baseSalary + e.bonus + e.stock + e.signingBonus) as avgTotalComp
             from Experience e
-            where e.status = :status
+            where e.status = :status and e.active = :active
             group by e.company.id
             """)
-    List<CompanyStatsProjection> aggregateByCompany(@Param("status") ExperienceStatus status);
+    List<CompanyStatsProjection> aggregateByCompany(@Param("status") ExperienceStatus status,
+                                                    @Param("active") boolean active);
 
     /**
      * Per-location aggregate stats over experiences in the given status (see
@@ -77,8 +80,9 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
                    avg(e.worthItScore) as avgWorthScore,
                    avg(e.stressLevel) as avgStress
             from Experience e
-            where e.status = :status
+            where e.status = :status and e.active = :active
             group by e.location.id
             """)
-    List<LocationStatsProjection> aggregateByLocation(@Param("status") ExperienceStatus status);
+    List<LocationStatsProjection> aggregateByLocation(@Param("status") ExperienceStatus status,
+                                                      @Param("active") boolean active);
 }

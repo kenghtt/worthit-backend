@@ -62,7 +62,7 @@ public class LocationService {
         boolean includeZeroExp = Boolean.TRUE.equals(includeZeroExperience);
 
         Map<Long, LocationStatsProjection> statsByLocation = experienceRepository
-                .aggregateByLocation(ExperienceStatus.published)
+                .aggregateByLocation(ExperienceStatus.published, true)
                 .stream()
                 .collect(Collectors.toMap(LocationStatsProjection::getLocationId, Function.identity()));
 
@@ -96,7 +96,7 @@ public class LocationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Location not found: " + slug));
 
         LocationStatsProjection stats = experienceRepository
-                .aggregateByLocation(ExperienceStatus.published)
+                .aggregateByLocation(ExperienceStatus.published, true)
                 .stream()
                 .filter(s -> s.getLocationId().equals(location.getId()))
                 .findFirst()
@@ -125,7 +125,7 @@ public class LocationService {
         int pageSize = normalizeLimit(limit);
 
         List<LocationCompanySummary> all = experienceRepository
-                .findForLocation(location.getId(), ExperienceStatus.published)
+                .findForLocation(location.getId(), ExperienceStatus.published, true)
                 .stream()
                 .collect(Collectors.groupingBy(e -> e.getCompany().getId()))
                 .values()

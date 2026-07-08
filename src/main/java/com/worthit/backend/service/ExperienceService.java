@@ -89,7 +89,7 @@ public class ExperienceService {
                 .reversed();
 
         List<ExperienceSummary> all = experienceRepository
-                .findForCompanyRole(company.getId(), role.getId(), ExperienceStatus.published)
+                .findForCompanyRole(company.getId(), role.getId(), ExperienceStatus.published, true)
                 .stream()
                 .filter(e -> citySlug == null || citySlug.equalsIgnoreCase(e.getLocation().getSlug()))
                 .sorted(newestFirst)
@@ -138,6 +138,7 @@ public class ExperienceService {
                 .whyLeave(blankToNull(req.whyLeave()))
                 .wishKnew(blankToNull(req.wishKnew()))
                 .status(ExperienceStatus.pending)
+                .active(false)
                 .build();
 
         return ExperienceSummary.from(experienceRepository.save(experience));
