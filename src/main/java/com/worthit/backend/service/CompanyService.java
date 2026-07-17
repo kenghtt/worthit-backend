@@ -6,14 +6,12 @@ import com.worthit.backend.dto.LevelSummary;
 import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.dto.RoleSummary;
 import com.worthit.backend.entity.Company;
-import com.worthit.backend.entity.CompanyRole;
 import com.worthit.backend.entity.Experience;
 import com.worthit.backend.entity.ExperienceStatus;
 import com.worthit.backend.entity.Level;
 import com.worthit.backend.entity.Role;
 import com.worthit.backend.exception.ResourceNotFoundException;
 import com.worthit.backend.repository.CompanyRepository;
-import com.worthit.backend.repository.CompanyRoleRepository;
 import com.worthit.backend.repository.CompanyStatsProjection;
 import com.worthit.backend.repository.ExperienceRepository;
 import com.worthit.backend.repository.LevelRepository;
@@ -57,7 +55,6 @@ public class CompanyService {
     static final int SEARCH_MAX_LIMIT = 20;
 
     private final CompanyRepository companyRepository;
-    private final CompanyRoleRepository companyRoleRepository;
     private final RoleRepository roleRepository;
     private final ExperienceRepository experienceRepository;
     private final LevelRepository levelRepository;
@@ -143,11 +140,11 @@ public class CompanyService {
     }
 
     /**
-     * Lists the roles available at a company, each with per-role aggregate stats
-     * (see {@code api-endpoints.md} §2.3). The role list is driven by the {@code company_role}
-     * join (see {@code database-spec.md} §5); stats — counts, average worth/stress, and the
-     * base-salary min/max/average — are computed from the company's {@code published} experiences
-     * (see §10). Roles with no published experiences are still listed, with {@code null} stats.
+     * Lists per-role aggregates for a company (see {@code api-endpoints.md} §2.3), based only on
+     * experiences visible in public reads ({@code status=published && active=true}).
+     *
+     * <p>This keeps the "Experience by role" table aligned with real data: roles with zero
+     * qualifying experiences are omitted instead of being shown with placeholder/unknown stats.</p>
      *
      * <p>Like §2.1, aggregation is done in memory and the result is name-sorted and
      * cursor-paged.</p>
@@ -167,10 +164,9 @@ public class CompanyService {
                 .stream()
                 .collect(Collectors.groupingBy(e -> e.getRole().getId()));
 
-        List<RoleSummary> all = companyRoleRepository.findActiveWithRoleByCompanyId(company.getId()).stream()
-                .map(CompanyRole::getRole)
-                .filter(Role::isActive)
-                .map(role -> toRoleSummary(role, experiencesByRole.getOrDefault(role.getId(), List.of())))
+        List<RoleSummary> all = experiencesByRole.values().stream()
+                .filter(experiences -> !experiences.isEmpty())
+                .map(experiences -> toRoleSummary(experiences.get(0).getRole(), experiences))
                 .sorted(Comparator
                         .comparing((RoleSummary r) -> r.name().toLowerCase(Locale.ROOT))
                         .thenComparing(RoleSummary::slug))

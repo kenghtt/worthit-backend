@@ -62,8 +62,7 @@ public class ExperienceService {
      * <p>Company and role are supplied as slugs; the matching rows are sorted and paged in
      * memory.</p>
      *
-     * @throws ResourceNotFoundException if no active company or role with the given slug exists,
-     *                                   or the role is not offered at the company
+     * @throws ResourceNotFoundException if no active company or role with the given slug exists
      */
     @Transactional(readOnly = true)
     public PageResponse<ExperienceSummary> listExperiences(String slug, String roleSlug, String city,
@@ -74,11 +73,6 @@ public class ExperienceService {
         Role role = roleRepository.findBySlug(roleSlug)
                 .filter(Role::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + roleSlug));
-        if (!companyRoleRepository.existsByCompany_IdAndRole_Id(company.getId(), role.getId())) {
-            throw new ResourceNotFoundException(
-                    "Role not offered at company: " + slug + "/" + roleSlug);
-        }
-
         int pageSize = normalizeLimit(limit);
         String citySlug = (city == null || city.isBlank()) ? null : city.trim();
 
