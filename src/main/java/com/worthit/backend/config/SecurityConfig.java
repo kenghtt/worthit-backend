@@ -28,6 +28,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -107,7 +108,7 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
-        config.setAllowedOrigins(allowedOrigins);
+        config.setAllowedOrigins(normalizeOrigins(allowedOrigins));
         config.addAllowedMethod("GET");
         config.addAllowedMethod("POST");
         config.addAllowedMethod("PUT");
@@ -120,6 +121,19 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
+    }
+
+    private static List<String> normalizeOrigins(List<String> configuredOrigins) {
+        if (configuredOrigins == null) {
+            return List.of();
+        }
+        return configuredOrigins.stream()
+                .filter(origin -> origin != null && !origin.isBlank())
+                .flatMap(origin -> Arrays.stream(origin.split(",")))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .distinct()
+                .toList();
     }
 
     @Bean

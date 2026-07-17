@@ -12,6 +12,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -54,7 +55,7 @@ public class SecurityConfigLocal {
         CorsConfiguration config = new CorsConfiguration();
         // allowCredentials=false matches v1 (no cookies/auth header); UI must NOT use credentials:'include'.
         config.setAllowCredentials(false);
-        config.setAllowedOrigins(allowedOrigins);
+        config.setAllowedOrigins(normalizeOrigins(allowedOrigins));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.addAllowedHeader("*");
         config.addExposedHeader("*");
@@ -62,5 +63,18 @@ public class SecurityConfigLocal {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
+    }
+
+    private static List<String> normalizeOrigins(List<String> configuredOrigins) {
+        if (configuredOrigins == null) {
+            return List.of();
+        }
+        return configuredOrigins.stream()
+                .filter(origin -> origin != null && !origin.isBlank())
+                .flatMap(origin -> Arrays.stream(origin.split(",")))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .distinct()
+                .toList();
     }
 }
