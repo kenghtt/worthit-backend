@@ -320,6 +320,7 @@ Only experiences with `status=published` and `active=true` are returned.
 | `whatWasItLike` | `why_stay` / `why_leave` |
 | `advice` | `wish_knew` |
 | `submittedDate` | format from `created_at` |
+| `active` | `active` |
 | `location` | `` `${city}, ${state}` `` |
 
 ---

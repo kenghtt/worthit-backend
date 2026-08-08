@@ -18,7 +18,7 @@ public record CompanySummary(
         @JsonProperty("roleCount") long roleCount,
         @JsonProperty("avgWorthScore") BigDecimal avgWorthScore,
         @JsonProperty("avgStress") BigDecimal avgStress,
-        @JsonProperty("avgHoursPerWeek") BigDecimal avgHoursPerWeek,
         @JsonProperty("avgTotalComp") BigDecimal avgTotalComp
+
 ) {
 }

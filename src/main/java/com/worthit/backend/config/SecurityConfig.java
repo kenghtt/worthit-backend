@@ -85,7 +85,7 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(authz -> authz
                         // Public probes — keep these open even when auth is enabled.
-                        .requestMatchers("/api/hello", "/actuator/health").permitAll()
+                        .requestMatchers("/", "/api/hello", "/actuator/health").permitAll()
                         // TODO(worthIt): add public endpoints (e.g. /api/auth/**) here as needed.
                         .anyRequest().authenticated()
                 )

@@ -2,6 +2,7 @@ package com.worthit.backend.controller;
 
 import com.worthit.backend.dto.CompanyDetail;
 import com.worthit.backend.dto.CompanySummary;
+import com.worthit.backend.dto.ExperienceSummary;
 import com.worthit.backend.dto.LevelSummary;
 import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.dto.RoleSummary;
