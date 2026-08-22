@@ -302,8 +302,9 @@ query params (slugs) rather than path segments.
 
 Only experiences with `active=true` are returned.
 
-**Errors:** `404` if company or role slug invalid, or role not linked to company. Unknown
-`city` slug → empty page (not 404).
+**Errors:** `404` if company slug is invalid or the role slug does not exist. Unknown
+`city` slug → empty page (not 404). A role can still resolve here even when its lookup row is
+inactive, as long as active experiences already reference that slug.
 
 **UI:** `ExperiencesList.jsx`, `IndividualExperienceModal`, `RoleDetail.jsx`.
 
@@ -321,6 +322,9 @@ Only experiences with `active=true` are returned.
 | `advice` | `wish_knew` |
 | `submittedDate` | format from `created_at` |
 | `active` | `active` |
+| `company` | `company_name` |
+| `role` | `role_name` |
+| `level` | `level_name` |
 | `location` | `` `${city}, ${state}` `` |
 
 ---
