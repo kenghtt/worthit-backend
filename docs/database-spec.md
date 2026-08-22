@@ -207,7 +207,7 @@ populates the experiences list and the individual experience modal.
 | `why_stay`          | TEXT         | NULL                                     | Free-text narrative                                  |
 | `why_leave`         | TEXT         | NULL                                     | Free-text narrative                                  |
 | `wish_knew`         | TEXT         | NULL                                     | "What I wish I knew" (UI shows as `advice`/note)     |
-| `status`            | ENUM         | NOT NULL DEFAULT 'pending'               | See §9 (`experience_status`)                         |
+| `status`            | ENUM         | NULL (legacy; ignored by runtime)        | Retained temporarily for backward compatibility      |
 | `created_at`        | TIMESTAMPTZ  | NOT NULL DEFAULT now()                   | Submission timestamp (UI shows as `submittedDate`)   |
 | `updated_at`        | TIMESTAMPTZ  | NOT NULL DEFAULT now()                   |                                                      |
 
@@ -216,7 +216,6 @@ Indexes:
 - INDEX (`company_id`, `role_id`)
 - INDEX (`company_id`, `role_id`, `location_id`)
 - INDEX (`location_id`)
-- INDEX (`status`) — so list endpoints can filter to `published` only
 - INDEX (`created_at`) — cursor pagination / "most recent" ordering
 
 > **Culture sub-scores (optional, future):** the submit form collects extra
@@ -240,18 +239,13 @@ Whether the reviewer is/was current or former at the company.
 | `current` | Currently employed there      |
 | `former`  | Previously employed there     |
 
-### `experience_status`
-Moderation lifecycle of a submitted experience.
+### `experience_status` (legacy)
+This enum is no longer used by application runtime logic. Public visibility and
+aggregate inclusion now rely only on `experience.active`.
 
-| Value       | Meaning                                                  |
-|-------------|----------------------------------------------------------|
-| `pending`   | Submitted, awaiting moderation (default on insert)       |
-| `published` | Visible in public list / detail endpoints                |
-| `rejected`  | Hidden; failed moderation                                |
-
-> Only `published` experiences are returned by public read endpoints and only
-> they count toward aggregate stats (§10). The seeder inserts rows directly as
-> `published`.
+The column remains in the physical schema temporarily for backward
+compatibility with older databases, but new application code does not read or
+write it.
 
 ---
 
@@ -259,7 +253,7 @@ Moderation lifecycle of a submitted experience.
 
 The UI shows aggregate stats (average WorthIt score, average stress, counts)
 on company cards, location cards, role lists, etc. These are **not** stored
-columns; they are computed from `experience` rows where `status = 'published'`.
+columns; they are computed from `experience` rows where `active = true`.
 
 Per **company**:
 - `experience_count` = COUNT(*)
@@ -296,7 +290,7 @@ experience, but the model stores a single `hours_per_week`. Decide one of:
 3. Seed `company_role` links.
 4. Seed one `location` per distinct company HQ.
 5. Seed per-company `level` ladders for common employers.
-6. Seed ~5 `experience` rows per demo company (status `published`).
+6. Seed ~5 active `experience` rows per demo company.
 
 To use it, implement the entities/repositories listed in §2 and flip
 `app.seed.enabled=true`.
@@ -305,7 +299,7 @@ To use it, implement the entities/repositories listed in §2 and flip
 
 ## 12. Build order (suggested)
 
-1. Create the 6 entities + 2 enums above (`@Entity` / `@Enumerated`).
+1. Create the 6 entities + 1 active runtime enum above (`@Entity` / `@Enumerated`).
 2. Create the matching Spring Data repositories (method names already implied
    by `DataSeeder`, e.g. `findBySlug`, `findByCityAndState`,
    `findByCompany_IdOrderByNormalizedRankAsc`, `countByCompany_Id`,

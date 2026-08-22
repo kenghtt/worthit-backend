@@ -6,7 +6,7 @@ import java.math.BigDecimal;
 
 /**
  * Per-company card scoped to a single location (see {@code api-endpoints.md} §3.3): a company that
- * has {@code published} experiences in the city, with its stats computed from only that city's
+ * has active experiences in the city, with its stats computed from only that city's
  * experiences. Score averages are one-decimal.
  *
  * <p>Field names are forced to camelCase via {@link JsonProperty} to match the UI contract,

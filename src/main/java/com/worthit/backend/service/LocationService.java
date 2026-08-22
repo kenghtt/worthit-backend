@@ -5,7 +5,6 @@ import com.worthit.backend.dto.LocationSummary;
 import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.entity.Company;
 import com.worthit.backend.entity.Experience;
-import com.worthit.backend.entity.ExperienceStatus;
 import com.worthit.backend.entity.Location;
 import com.worthit.backend.exception.ResourceNotFoundException;
 import com.worthit.backend.repository.ExperienceRepository;
@@ -30,7 +29,7 @@ import java.util.stream.Collectors;
  * Read-side logic for the location endpoints (see {@code api-endpoints.md} §3): location
  * list/search with per-city aggregate stats.
  *
- * <p>Mirrors {@link CompanyService}: aggregate stats are computed from {@code published}
+ * <p>Mirrors {@link CompanyService}: aggregate stats are computed from active
  * experiences and results are filtered/sorted/paged in memory (see {@link #paginate}).</p>
  */
 @Service
@@ -49,8 +48,8 @@ public class LocationService {
      * Lists / searches locations, each with per-city aggregate stats
      * (see {@code api-endpoints.md} §3.1). The optional {@code q} is a case-insensitive substring
      * match on the city name; stats — experience count, distinct company count, and average
-     * worth/stress — are computed from {@code published} experiences. By default, locations with no
-     * published experiences are excluded; pass {@code includeZeroExperience=true} to list them
+     * worth/stress — are computed from active experiences. By default, locations with no
+     * active experiences are excluded; pass {@code includeZeroExperience=true} to list them
      * (with {@code 0} counts and {@code null} averages).
      *
      * <p>Results are city-name sorted (slug tiebreaker) and cursor-paged.</p>
@@ -62,7 +61,7 @@ public class LocationService {
         boolean includeZeroExp = Boolean.TRUE.equals(includeZeroExperience);
 
         Map<Long, LocationStatsProjection> statsByLocation = experienceRepository
-                .aggregateByLocation(ExperienceStatus.published, true)
+                .aggregateByLocation(true)
                 .stream()
                 .collect(Collectors.toMap(LocationStatsProjection::getLocationId, Function.identity()));
 
@@ -84,7 +83,7 @@ public class LocationService {
     /**
      * Returns a single location with its per-city aggregate stats by slug
      * (see {@code api-endpoints.md} §3.2). Same shape as the §3.1 list item; stats are computed
-     * from {@code published} experiences, so a location with none yet still resolves with
+     * from active experiences, so a location with none yet still resolves with
      * {@code 0} counts and {@code null} averages.
      *
      * @throws ResourceNotFoundException if no active location with the slug exists
@@ -96,7 +95,7 @@ public class LocationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Location not found: " + slug));
 
         LocationStatsProjection stats = experienceRepository
-                .aggregateByLocation(ExperienceStatus.published, true)
+                .aggregateByLocation(true)
                 .stream()
                 .filter(s -> s.getLocationId().equals(location.getId()))
                 .findFirst()
@@ -106,9 +105,9 @@ public class LocationService {
     }
 
     /**
-     * Lists the companies that have {@code published} experiences in a location, each with stats
+     * Lists the companies that have active experiences in a location, each with stats
      * scoped to that city (see {@code api-endpoints.md} §3.3). A company only appears if it has at
-     * least one published experience in the city; stats — experience count and average
+     * least one active experience in the city; stats — experience count and average
      * worth/stress — are computed from just those experiences.
      *
      * <p>Like §3.1, results are name-sorted (slug tiebreaker) and cursor-paged in memory.</p>
@@ -125,7 +124,7 @@ public class LocationService {
         int pageSize = normalizeLimit(limit);
 
         List<LocationCompanySummary> all = experienceRepository
-                .findForLocation(location.getId(), ExperienceStatus.published, true)
+                .findForLocation(location.getId(), true)
                 .stream()
                 .collect(Collectors.groupingBy(e -> e.getCompany().getId()))
                 .values()

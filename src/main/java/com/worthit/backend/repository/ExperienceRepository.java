@@ -1,7 +1,6 @@
 package com.worthit.backend.repository;
 
 import com.worthit.backend.entity.Experience;
-import com.worthit.backend.entity.ExperienceStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,13 +12,13 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
     long countByCompany_Id(Long companyId);
 
     /**
-     * All experiences for a company in the given status (see {@code api-endpoints.md} §2.3).
+     * All active experiences for a company (see {@code api-endpoints.md} §2.3).
      * Loaded so per-role aggregates — including the salary average — can be computed in memory.
      */
-    List<Experience> findByCompany_IdAndStatusAndActive(Long companyId, ExperienceStatus status, boolean active);
+    List<Experience> findByCompany_IdAndActive(Long companyId, boolean active);
 
     /**
-     * Experiences for a company + role in the given status (see {@code api-endpoints.md} §2.4),
+     * Active experiences for a company + role (see {@code api-endpoints.md} §2.4),
      * with the company / role / location / level relations eagerly fetched to avoid N+1 when
      * the result is mapped to the response shape.
      */
@@ -29,29 +28,27 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
             join fetch e.role r
             join fetch e.location l
             left join fetch e.level lv
-            where c.id = :companyId and r.id = :roleId and e.status = :status and e.active = :active
+            where c.id = :companyId and r.id = :roleId and e.active = :active
             """)
     List<Experience> findForCompanyRole(@Param("companyId") Long companyId,
                                         @Param("roleId") Long roleId,
-                                        @Param("status") ExperienceStatus status,
                                         @Param("active") boolean active);
 
     /**
-     * Experiences in a location in the given status (see {@code api-endpoints.md} §3.3), with the
+     * Active experiences in a location (see {@code api-endpoints.md} §3.3), with the
      * company eagerly fetched so per-company stats scoped to the city can be computed in memory
      * without an N+1.
      */
     @Query("""
             select e from Experience e
             join fetch e.company c
-            where e.location.id = :locationId and e.status = :status and e.active = :active
+            where e.location.id = :locationId and e.active = :active
             """)
     List<Experience> findForLocation(@Param("locationId") Long locationId,
-                                     @Param("status") ExperienceStatus status,
                                      @Param("active") boolean active);
 
     /**
-     * Per-company aggregate stats over experiences in the given status (see
+     * Per-company aggregate stats over active experiences (see
      * {@code database-spec.md} §10). Companies with no matching experiences are not returned.
      */
     @Query("""
@@ -63,14 +60,13 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
                    avg(e.hoursPerWeek) as avgHoursPerWeek,
                    avg(e.baseSalary + e.bonus + e.stock + e.signingBonus) as avgTotalComp
             from Experience e
-            where e.status = :status and e.active = :active
+            where e.active = :active
             group by e.company.id
             """)
-    List<CompanyStatsProjection> aggregateByCompany(@Param("status") ExperienceStatus status,
-                                                    @Param("active") boolean active);
+    List<CompanyStatsProjection> aggregateByCompany(@Param("active") boolean active);
 
     /**
-     * Per-location aggregate stats over experiences in the given status (see
+     * Per-location aggregate stats over active experiences (see
      * {@code api-endpoints.md} §3.1). Locations with no matching experiences are not returned.
      */
     @Query("""
@@ -80,9 +76,8 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
                    avg(e.worthItScore) as avgWorthScore,
                    avg(e.stressLevel) as avgStress
             from Experience e
-            where e.status = :status and e.active = :active
+            where e.active = :active
             group by e.location.id
             """)
-    List<LocationStatsProjection> aggregateByLocation(@Param("status") ExperienceStatus status,
-                                                      @Param("active") boolean active);
+    List<LocationStatsProjection> aggregateByLocation(@Param("active") boolean active);
 }

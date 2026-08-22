@@ -3,9 +3,8 @@ package com.worthit.backend.seed;
 import com.worthit.backend.entity.Company;
 import com.worthit.backend.entity.EmploymentStatus;
 import com.worthit.backend.entity.Experience;
-import com.worthit.backend.entity.ExperienceStatus;
-import com.worthit.backend.entity.Level;
 import com.worthit.backend.entity.CompanyRole;
+import com.worthit.backend.entity.Level;
 import com.worthit.backend.entity.Location;
 import com.worthit.backend.entity.Role;
 import com.worthit.backend.repository.CompanyRepository;
@@ -60,7 +59,7 @@ public class DataSeeder implements ApplicationRunner {
     private static final int EXPERIENCES_PER_COMPANY = 5;
 
     /**
-     * Target total published experiences for Amazon after bulk seeding. The generic pass seeds
+     * Target total active experiences for Amazon after bulk seeding. The generic pass seeds
      * {@link #EXPERIENCES_PER_COMPANY} first; this top-up adds the rest across all Amazon roles.
      */
     private static final int AMAZON_TARGET_EXPERIENCE_COUNT = 125;
@@ -825,10 +824,9 @@ public class DataSeeder implements ApplicationRunner {
     }
 
     /**
-     * Declare which roles are available at which companies.
-     * - Base 4 roles are mapped to ALL companies
-     * - "AI Engineer" only to Amazon
-     * - "Network Engineer" only to Google
+     * Seed company-role links for browse/detail fixtures that still read from {@code company_role}.
+     * This supports seeded company role cards and bulk sample experiences only; submit-time role
+     * availability now comes from the global {@code role} table / {@code GET /api/v1/roles}.
      */
     private int seedCompanyRoles() {
         List<Company> companies = companyRepository.findAll();
@@ -900,7 +898,7 @@ public class DataSeeder implements ApplicationRunner {
     }
 
     /**
-     * Seeds a small set of published {@link Experience} rows for every active company so the
+     * Seeds a small set of active {@link Experience} rows for every active company so the
      * UI has aggregates (worth score, experience count, comp ranges) to render. Idempotent:
      * if a company already has any experiences, it is skipped.
      */
@@ -960,8 +958,7 @@ public class DataSeeder implements ApplicationRunner {
                         .hoursPerWeek(hours)
                         .worthItScore(worth)
                         .wishKnew("Seeded test data for " + company.getName() + ".")
-                        .status(ExperienceStatus.published)
-                        .active(false)
+                        .active(true)
                         .build());
                 inserted++;
             }
@@ -970,7 +967,7 @@ public class DataSeeder implements ApplicationRunner {
     }
 
     /**
-     * Top up Amazon with {@value #AMAZON_TARGET_EXPERIENCE_COUNT} total published experiences,
+     * Top up Amazon with {@value #AMAZON_TARGET_EXPERIENCE_COUNT} total active experiences,
      * spread across every role linked to the company. Idempotent: only inserts until the target
      * count is reached (safe on every boot).
      */
@@ -1040,8 +1037,7 @@ public class DataSeeder implements ApplicationRunner {
                     .whyStay(narrative[0])
                     .whyLeave(narrative[1])
                     .wishKnew(narrative[2])
-                    .status(ExperienceStatus.published)
-                    .active(false)
+                    .active(true)
                     .build());
             inserted++;
         }

@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 /**
- * A single published experience for a company + role (see {@code api-endpoints.md} §2.4).
+ * A single active experience for a company + role (see {@code api-endpoints.md} §2.4).
  *
  * <p>Unlike the company/role summary DTOs, this one is shaped to mirror the {@code experience}
  * DB columns (see {@code database-spec.md} §8) rather than the UI's mock field names: it relies

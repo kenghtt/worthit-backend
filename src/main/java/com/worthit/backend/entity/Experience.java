@@ -34,7 +34,6 @@ import java.time.OffsetDateTime;
                 @Index(name = "idx_experience_company_role", columnList = "company_id, role_id"),
                 @Index(name = "idx_experience_company_role_location", columnList = "company_id, role_id, location_id"),
                 @Index(name = "idx_experience_location", columnList = "location_id"),
-                @Index(name = "idx_experience_status", columnList = "status"),
                 @Index(name = "idx_experience_created_at", columnList = "created_at")
         }
 )
@@ -113,11 +112,6 @@ public class Experience {
 
     @Column(name = "wish_knew", columnDefinition = "TEXT")
     private String wishKnew;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    @Builder.Default
-    private ExperienceStatus status = ExperienceStatus.pending;
 
     @Column(nullable = false, columnDefinition = "boolean default false")
     @Builder.Default

@@ -47,7 +47,7 @@ public class Role {
 
     @Column(nullable = false)
     @Builder.Default
-    private boolean active = true;
+    private boolean active = false;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

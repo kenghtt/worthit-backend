@@ -28,7 +28,7 @@ public class ExperienceController {
     private final ExperienceService experienceService;
 
     /**
-     * {@code GET /api/v1/experiences} — list published experiences filtered by company + role
+     * {@code GET /api/v1/experiences} — list active experiences filtered by company + role
      * (see {@code api-endpoints.md} §2.4), newest first. The {@code company} and {@code role}
      * query params are the company and role slugs; the optional {@code city} filters by location
      * slug. Returns {@code 404} (via {@code GlobalExceptionHandler}) if no active company or role
@@ -48,8 +48,8 @@ public class ExperienceController {
 
     /**
      * {@code POST /api/v1/experiences} — create a new experience (see {@code api-endpoints.md} §4.1).
-     * The submission is persisted as {@code pending} and does not appear in read endpoints until
-     * moderated/published. Returns {@code 201 Created} with the created experience (§2.4 shape), or
+     * The submission is persisted as inactive and does not appear in read endpoints until activated.
+     * Returns {@code 201 Created} with the created experience (§2.4 shape), or
      * {@code 400} with validation {@code details} (via {@code GlobalExceptionHandler}).
      */
     @PostMapping

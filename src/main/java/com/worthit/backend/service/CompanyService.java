@@ -7,7 +7,6 @@ import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.dto.RoleSummary;
 import com.worthit.backend.entity.Company;
 import com.worthit.backend.entity.Experience;
-import com.worthit.backend.entity.ExperienceStatus;
 import com.worthit.backend.entity.Level;
 import com.worthit.backend.entity.Role;
 import com.worthit.backend.exception.ResourceNotFoundException;
@@ -36,7 +35,7 @@ import java.util.stream.Collectors;
  * list/search, company detail, search-bar typeahead, per-company roles, and the experiences for
  * a company + role.
  *
- * <p>Aggregate stats are computed from {@code published} experiences. Given the current data
+ * <p>Aggregate stats are computed from active experiences. Given the current data
  * size results are filtered/sorted/paged in memory (see {@link #paginate}), which keeps support
  * for sorting by derived aggregates (worth score, experience count) straightforward.</p>
  */
@@ -67,7 +66,7 @@ public class CompanyService {
         boolean includeZeroExp = Boolean.TRUE.equals(includeZeroExperience);
 
         Map<Long, CompanyStatsProjection> statsByCompany = experienceRepository
-                .aggregateByCompany(ExperienceStatus.published, true)
+                .aggregateByCompany(true)
                 .stream()
                 .collect(Collectors.toMap(CompanyStatsProjection::getCompanyId, Function.identity()));
 
@@ -141,7 +140,7 @@ public class CompanyService {
 
     /**
      * Lists per-role aggregates for a company (see {@code api-endpoints.md} §2.3), based only on
-     * experiences visible in public reads ({@code status=published && active=true}).
+     * experiences visible in public reads ({@code active=true}).
      *
      * <p>This keeps the "Experience by role" table aligned with real data: roles with zero
      * qualifying experiences are omitted instead of being shown with placeholder/unknown stats.</p>
@@ -160,7 +159,7 @@ public class CompanyService {
         int pageSize = normalizeLimit(limit);
 
         Map<Long, List<Experience>> experiencesByRole = experienceRepository
-                .findByCompany_IdAndStatusAndActive(company.getId(), ExperienceStatus.published, true)
+                .findByCompany_IdAndActive(company.getId(), true)
                 .stream()
                 .collect(Collectors.groupingBy(e -> e.getRole().getId()));
 
@@ -177,7 +176,8 @@ public class CompanyService {
 
     /**
      * Lists the level options for a company's submit-form level picker (see {@code api-endpoints.md}
-     * §5), ordered by {@code normalizedRank} ascending. Returns {@code 404} if no active company
+     * §5), ordered by {@code normalizedRank} ascending. If the company has no active level rows,
+     * falls back to the backend-managed default ladder. Returns {@code 404} if no active company
      * has the slug.
      *
      * @throws ResourceNotFoundException if no active company with the slug exists
@@ -194,6 +194,10 @@ public class CompanyService {
                 .filter(Level::isActive)
                 .map(l -> new LevelSummary(l.getName(), l.getNormalizedRank()))
                 .toList();
+
+        if (all.isEmpty()) {
+            all = LevelCatalog.DEFAULT_LEVELS;
+        }
 
         return paginate(all, cursor, pageSize);
     }
