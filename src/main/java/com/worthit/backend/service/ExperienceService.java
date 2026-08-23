@@ -171,7 +171,7 @@ public class ExperienceService {
                 .orElseGet(() -> companyRepository.save(Company.builder()
                         .slug(slug)
                         .name(displayName)
-                        .active(true)
+                        .active(false)
                         .build()));
     }
 
