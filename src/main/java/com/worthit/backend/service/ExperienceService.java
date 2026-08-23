@@ -206,7 +206,7 @@ public class ExperienceService {
                         .slug(SlugUtil.slugify(city + " " + state))
                         .city(city)
                         .state(state)
-                        .active(true)
+                        .active(false)
                         .build()));
     }
 
