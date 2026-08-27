@@ -244,6 +244,7 @@ public class CompanyService {
         long roleCount = stats == null ? 0L : stats.getRoleCount();
         BigDecimal avgWorth = stats == null ? null : scale(stats.getAvgWorthScore());
         BigDecimal avgStress = stats == null ? null : scale(stats.getAvgStress());
+        BigDecimal avgHoursPerWeek = stats == null ? null : scale(stats.getAvgHoursPerWeek());
         BigDecimal avgTotalComp = stats == null || stats.getAvgTotalComp() == null
                 ? null
                 : stats.getAvgTotalComp().setScale(0, RoundingMode.HALF_UP);
@@ -256,6 +257,7 @@ public class CompanyService {
                 roleCount,
                 avgWorth,
                 avgStress,
+                avgHoursPerWeek,
                 avgTotalComp
         );
     }

@@ -18,6 +18,8 @@ public interface CompanyStatsProjection {
 
     BigDecimal getAvgStress();
 
+    BigDecimal getAvgHoursPerWeek();
+
     /** Average total compensation (base + bonus + stock + signing bonus). */
     BigDecimal getAvgTotalComp();
 }
