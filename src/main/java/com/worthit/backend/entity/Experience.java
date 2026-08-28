@@ -104,14 +104,8 @@ public class Experience {
     @Column(name = "worth_it_score", nullable = false, precision = 3, scale = 1)
     private BigDecimal worthItScore;
 
-    @Column(name = "why_stay", columnDefinition = "TEXT")
-    private String whyStay;
-
-    @Column(name = "why_leave", columnDefinition = "TEXT")
-    private String whyLeave;
-
-    @Column(name = "wish_knew", columnDefinition = "TEXT")
-    private String wishKnew;
+    @Column(name = "worth_it_reason", columnDefinition = "TEXT")
+    private String worthItReason;
 
     @Column(nullable = false, columnDefinition = "boolean default false")
     @Builder.Default

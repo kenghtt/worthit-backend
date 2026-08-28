@@ -121,9 +121,7 @@ public class ExperienceService {
                 .stressLevel(req.stressLevel())
                 .hoursPerWeek(req.hoursPerWeek())
                 .worthItScore(req.worthItScore())
-                .whyStay(blankToNull(req.whyStay()))
-                .whyLeave(blankToNull(req.whyLeave()))
-                .wishKnew(blankToNull(req.wishKnew()))
+                .worthItReason(blankToNull(req.worthItReason()))
                 .active(false)
                 .build();
 

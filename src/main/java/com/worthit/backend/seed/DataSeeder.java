@@ -957,7 +957,7 @@ public class DataSeeder implements ApplicationRunner {
                         .stressLevel(stress)
                         .hoursPerWeek(hours)
                         .worthItScore(worth)
-                        .wishKnew("Seeded test data for " + company.getName() + ".")
+                        .worthItReason("Seeded test data for " + company.getName() + ".")
                         .active(true)
                         .build());
                 inserted++;
@@ -1034,9 +1034,7 @@ public class DataSeeder implements ApplicationRunner {
                     .stressLevel(stress)
                     .hoursPerWeek(hours)
                     .worthItScore(worth)
-                    .whyStay(narrative[0])
-                    .whyLeave(narrative[1])
-                    .wishKnew(narrative[2])
+                    .worthItReason(narrative[2])
                     .active(true)
                     .build());
             inserted++;
