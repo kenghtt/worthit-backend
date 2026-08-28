@@ -81,7 +81,7 @@ response) use **snake_case** because they mirror DB columns:
 | `base_salary`, `bonus`, `stock`, `signing_bonus` | Whole USD |
 | `employment_status` | `"current"` or `"past"` (see note below) |
 | `created_at` | ISO-8601 UTC timestamp |
-| `why_stay`, `why_leave`, `wish_knew` | Free text (nullable) |
+| `worth_it_reason` | Optional free text explaining the score |
 
 **POST request bodies** use **camelCase** (`worthItScore`, `employmentStatus`, …).
 
@@ -318,8 +318,7 @@ inactive, as long as active experiences already reference that slug.
 | `stress` | `stress_level` |
 | `equity` | `stock` |
 | `hoursMin` / `hoursMax` | `hours_per_week` (single value today) |
-| `whatWasItLike` | `why_stay` / `why_leave` |
-| `advice` | `wish_knew` |
+| `worthItReason` | `worth_it_reason` |
 | `submittedDate` | format from `created_at` |
 | `active` | `active` |
 | `company` | `company_name` |
@@ -463,9 +462,7 @@ Content-Type: application/json
   "stressLevel": 6.5,
   "hoursPerWeek": 45,
   "worthItScore": 7.5,
-  "whyStay": "Strong comp and learning.",
-  "whyLeave": "On-call burnout.",
-  "wishKnew": "Ask about on-call rotation before joining."
+  "worthItReason": "Ask about on-call rotation before joining."
 }
 ```
 
@@ -476,6 +473,7 @@ Content-Type: application/json
 | New role moderation | If the user enters a new role through `Other`, the backend creates a global `role` row with `active = false`. |
 | Level | Provide `level` as the display string selected from `GET /api/v1/companies/{slug}/levels`, or the text typed through `Other`. |
 | New level moderation | If the submitted level does not match an existing company level, the backend creates an inactive `level` row for that company and preserves the submitted text in `experience.level_name`. |
+| `worthItReason` | Optional; max `1000` characters by default, matching backend property `app.submit.worth-it-reason-max-length`. |
 | Required fields | `city`, `employmentStatus`, `yearsExperience`, `baseSalary`, `compensationYear`, `stressLevel`, `worthItScore` |
 | `employmentStatus` | `"current"` or `"former"` |
 | Scores | `stressLevel`, `worthItScore` in 0.0–10.0 |

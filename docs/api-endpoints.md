@@ -197,15 +197,15 @@ Returns `Page<ExperienceSummary>`, newest first (`created_at` desc, `id` desc
 tiebreaker), restricted to experiences where `active = true`. Each item **mirrors the
 `experience` DB columns** (see `database-spec.md` §8) rather than the UI's mock
 field names: field keys come from the global `snake_case` Jackson strategy
-(e.g. `worth_it_score`, `stress_level`, `wish_knew`, `created_at`), and the
+(e.g. `worth_it_score`, `stress_level`, `worth_it_reason`, `created_at`), and the
 foreign keys are expanded into their natural identifiers (company/role slug +
 name, location slug/city/state, level name). Internal DB primary keys are **not**
 included (see §1 "Internal IDs").
 
 `employment_status` is the DB enum value — one of `current` / `past` (note:
 `past`, not `former`). These fields are nullable and serialize as `null` when
-unset: `level_name`, `years_at_company`, `hours_per_week`, `why_stay`,
-`why_leave`, `wish_knew`. `created_at` is an ISO-8601 timestamp (UTC).
+unset: `level_name`, `years_at_company`, `hours_per_week`, `worth_it_reason`.
+`created_at` is an ISO-8601 timestamp (UTC).
 
 ```json
 {
@@ -231,9 +231,7 @@ unset: `level_name`, `years_at_company`, `hours_per_week`, `why_stay`,
       "hours_per_week": 45,
       "worth_it_score": 7.5,
       "active": true,
-      "why_stay": "Strong comp and learning.",
-      "why_leave": "On-call burnout.",
-      "wish_knew": "Ask about on-call rotation before joining.",
+      "worth_it_reason": "Ask about on-call rotation before joining.",
       "created_at": "2026-05-01T12:00:00Z"
     }
   ],
@@ -388,9 +386,7 @@ USD, scores 0.0–10.0):
   "stressLevel": 6.5,
   "hoursPerWeek": 45,
   "worthItScore": 7.5,
-  "whyStay": "Strong comp and learning.",
-  "whyLeave": "On-call burnout.",
-  "wishKnew": "Ask about on-call rotation before joining."
+  "worthItReason": "Ask about on-call rotation before joining."
 }
 ```
 
@@ -404,6 +400,8 @@ Mapping notes:
   existing company `level` row, the backend reuses that row; otherwise it creates
   a new inactive `level` row for the company and still snapshots the submitted
   text in `experience.level_name`.
+- `worthItReason` is optional and, by default, limited to `1000` characters;
+  the backend reads this cap from `app.submit.worth-it-reason-max-length`.
 - The form's culture sliders (`autonomy`, `coding`, `meetings`,
   `firefighting`, `micromanagement`, `psychologicalSafety`, `feedbackQuality`,
   `growthOpportunities`, `followManager`, `reviews`) are collected by the UI but
@@ -414,6 +412,7 @@ Mapping notes:
 - `companySlug`/`company`, `role`/`customRole`, `city` required.
 - `baseSalary` required, `>= 0`; `bonus`/`stock`/`signingBonus` `>= 0`.
 - `stressLevel`, `worthItScore` within `0.0–10.0`.
+- `worthItReason` optional, max length = configured `app.submit.worth-it-reason-max-length` (default `1000`).
 - `employmentStatus` ∈ {`current`, `former`}.
 
 **Response:** `201 Created` with the created experience (same shape as §2.4, without

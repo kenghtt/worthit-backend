@@ -204,9 +204,7 @@ populates the experiences list and the individual experience modal.
 | `stress_level`      | NUMERIC(3,1) | NOT NULL, CHECK (0.0–10.0)               | UI calls this `stress`                               |
 | `hours_per_week`    | SMALLINT     | NULL, CHECK (>= 0)                       | Typical weekly hours (see §10 hours note)            |
 | `worth_it_score`    | NUMERIC(3,1) | NOT NULL, CHECK (0.0–10.0)               | UI calls this `worthScore`                           |
-| `why_stay`          | TEXT         | NULL                                     | Free-text narrative                                  |
-| `why_leave`         | TEXT         | NULL                                     | Free-text narrative                                  |
-| `wish_knew`         | TEXT         | NULL                                     | "What I wish I knew" (UI shows as `advice`/note)     |
+| `worth_it_reason`   | TEXT         | NULL                                     | Optional explanation for the submitted worth-it score |
 | `status`            | ENUM         | NULL (legacy; ignored by runtime)        | Retained temporarily for backward compatibility      |
 | `created_at`        | TIMESTAMPTZ  | NOT NULL DEFAULT now()                   | Submission timestamp (UI shows as `submittedDate`)   |
 | `updated_at`        | TIMESTAMPTZ  | NOT NULL DEFAULT now()                   |                                                      |
