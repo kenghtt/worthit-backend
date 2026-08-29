@@ -7,8 +7,9 @@ import java.math.BigDecimal;
 /**
  * Per-role aggregate card for a company (see {@code api-endpoints.md} §2.3). The role list is
  * derived from the company's active experiences for that role (see {@code database-spec.md} §10).
- * Salary
- * figures are whole USD ({@code baseSalaryAverage} is the mean of the role's base salaries);
+ * Compensation
+ * figures are whole USD ({@code avgTotalComp} is the mean of base salary + bonus + stock +
+ * signing bonus for the role's experiences);
  * score averages are one-decimal. Stat fields are {@code null} (and {@code experienceCount} is
  * {@code 0}) when the role has no active experiences yet.
  *
@@ -21,8 +22,6 @@ public record RoleSummary(
         @JsonProperty("experienceCount") long experienceCount,
         @JsonProperty("avgWorthScore") BigDecimal avgWorthScore,
         @JsonProperty("avgStress") BigDecimal avgStress,
-        @JsonProperty("baseSalaryMin") Integer baseSalaryMin,
-        @JsonProperty("baseSalaryMax") Integer baseSalaryMax,
-        @JsonProperty("baseSalaryAverage") Integer baseSalaryAverage
+        @JsonProperty("avgTotalComp") Integer avgTotalComp
 ) {
 }

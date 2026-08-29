@@ -203,19 +203,13 @@ public class CompanyService {
     }
 
     private RoleSummary toRoleSummary(Role role, List<Experience> experiences) {
-        Integer salaryMin = experiences.isEmpty() ? null
-                : experiences.stream().mapToInt(Experience::getBaseSalary).min().getAsInt();
-        Integer salaryMax = experiences.isEmpty() ? null
-                : experiences.stream().mapToInt(Experience::getBaseSalary).max().getAsInt();
         return new RoleSummary(
                 role.getSlug(),
                 role.getName(),
                 experiences.size(),
                 averageScore(experiences, Experience::getWorthItScore),
                 averageScore(experiences, Experience::getStressLevel),
-                salaryMin,
-                salaryMax,
-                averageSalary(experiences)
+                averageTotalComp(experiences)
         );
     }
 
@@ -230,12 +224,13 @@ public class CompanyService {
         return sum.divide(BigDecimal.valueOf(experiences.size()), 1, RoundingMode.HALF_UP);
     }
 
-    private static Integer averageSalary(List<Experience> experiences) {
+    private static Integer averageTotalComp(List<Experience> experiences) {
         if (experiences.isEmpty()) {
             return null;
         }
-        // Sum as long to avoid overflow, then divide by count and round to whole USD.
-        long sum = experiences.stream().mapToLong(Experience::getBaseSalary).sum();
+        long sum = experiences.stream()
+                .mapToLong(e -> (long) e.getBaseSalary() + e.getBonus() + e.getStock() + e.getSigningBonus())
+                .sum();
         return (int) Math.round((double) sum / experiences.size());
     }
 

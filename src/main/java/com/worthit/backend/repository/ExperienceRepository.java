@@ -74,7 +74,8 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
                    count(e) as experienceCount,
                    count(distinct e.company.id) as companyCount,
                    avg(e.worthItScore) as avgWorthScore,
-                   avg(e.stressLevel) as avgStress
+                   avg(e.stressLevel) as avgStress,
+                   avg(e.baseSalary + e.bonus + e.stock + e.signingBonus) as avgTotalComp
             from Experience e
             where e.active = :active
             group by e.location.id

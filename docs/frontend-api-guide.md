@@ -356,7 +356,8 @@ GET /api/v1/locations?q=&includeZeroExperience=&cursor=&limit=
       "experienceCount": 12,
       "companyCount": 6,
       "avgWorthScore": 7.6,
-      "avgStress": 6.4
+      "avgStress": 6.4,
+      "avgTotalComp": 185000
     }
   ],
   "next_cursor": null
@@ -366,6 +367,9 @@ GET /api/v1/locations?q=&includeZeroExperience=&cursor=&limit=
 **UI:** `LocationsPage`, Home featured locations.
 
 **Client:** `listLocations(params)`.
+
+`avgTotalComp` is the average of `base_salary + bonus + stock + signing_bonus`
+for the active experiences in that city, rounded to whole USD.
 
 **Recommended usage:**
 - Default browse list (no search text): send `includeZeroExperience=false` so the table does not get flooded by cities without active experiences.
@@ -411,12 +415,16 @@ GET /api/v1/locations/{slug}/companies?cursor=&limit=
       "industry": "Tech",
       "experienceCount": 4,
       "avgWorthScore": 7.5,
-      "avgStress": 6.6
+      "avgStress": 6.6,
+      "avgTotalComp": 220000
     }
   ],
   "next_cursor": null
 }
 ```
+
+Each company row's `avgTotalComp` is scoped only to the active experiences from
+that city.
 
 **Errors:** `404` if location slug unknown.
 

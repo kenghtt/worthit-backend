@@ -17,4 +17,6 @@ public interface LocationStatsProjection {
     BigDecimal getAvgWorthScore();
 
     BigDecimal getAvgStress();
+
+    BigDecimal getAvgTotalComp();
 }

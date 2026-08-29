@@ -48,7 +48,7 @@ public class LocationService {
      * Lists / searches locations, each with per-city aggregate stats
      * (see {@code api-endpoints.md} §3.1). The optional {@code q} is a case-insensitive substring
      * match on the city name; stats — experience count, distinct company count, and average
-     * worth/stress — are computed from active experiences. By default, locations with no
+     * worth/stress/total-comp — are computed from active experiences. By default, locations with no
      * active experiences are excluded; pass {@code includeZeroExperience=true} to list them
      * (with {@code 0} counts and {@code null} averages).
      *
@@ -108,7 +108,7 @@ public class LocationService {
      * Lists the companies that have active experiences in a location, each with stats
      * scoped to that city (see {@code api-endpoints.md} §3.3). A company only appears if it has at
      * least one active experience in the city; stats — experience count and average
-     * worth/stress — are computed from just those experiences.
+     * worth/stress/total-comp — are computed from just those experiences.
      *
      * <p>Like §3.1, results are name-sorted (slug tiebreaker) and cursor-paged in memory.</p>
      *
@@ -146,7 +146,8 @@ public class LocationService {
                 company.getIndustry(),
                 experiences.size(),
                 averageScore(experiences, Experience::getWorthItScore),
-                averageScore(experiences, Experience::getStressLevel)
+                averageScore(experiences, Experience::getStressLevel),
+                averageTotalComp(experiences)
         );
     }
 
@@ -166,6 +167,9 @@ public class LocationService {
         long companyCount = stats == null ? 0L : stats.getCompanyCount();
         BigDecimal avgWorth = stats == null ? null : scale(stats.getAvgWorthScore());
         BigDecimal avgStress = stats == null ? null : scale(stats.getAvgStress());
+        BigDecimal avgTotalComp = stats == null || stats.getAvgTotalComp() == null
+                ? null
+                : stats.getAvgTotalComp().setScale(0, RoundingMode.HALF_UP);
         return new LocationSummary(
                 l.getSlug(),
                 l.getCity(),
@@ -173,8 +177,20 @@ public class LocationService {
                 experienceCount,
                 companyCount,
                 avgWorth,
-                avgStress
+                avgStress,
+                avgTotalComp
         );
+    }
+
+    private static BigDecimal averageTotalComp(List<Experience> experiences) {
+        if (experiences.isEmpty()) {
+            return null;
+        }
+        long sum = experiences.stream()
+                .mapToLong(e -> (long) e.getBaseSalary() + e.getBonus() + e.getStock() + e.getSigningBonus())
+                .sum();
+        return BigDecimal.valueOf(sum)
+                .divide(BigDecimal.valueOf(experiences.size()), 0, RoundingMode.HALF_UP);
     }
 
     private static BigDecimal scale(BigDecimal value) {

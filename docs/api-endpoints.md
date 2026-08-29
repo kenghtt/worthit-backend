@@ -311,7 +311,8 @@ Returns `Page<LocationSummary>`:
       "experienceCount": 12,
       "companyCount": 6,
       "avgWorthScore": 7.6,
-      "avgStress": 6.4
+      "avgStress": 6.4,
+      "avgTotalComp": 185000
     }
   ],
   "next_cursor": null
@@ -321,6 +322,11 @@ Returns `Page<LocationSummary>`:
 Behavior note:
 - When `includeZeroExperience` is omitted/`false`, the list excludes cities with no active experiences (`experienceCount = 0`) to keep the default browse table focused.
 - When `includeZeroExperience=true`, matching cities are returned regardless of experience count (recommended when the user enters a search query).
+
+`avgTotalComp` is the mean **total** compensation per experience in that city —
+the sum of `base_salary + bonus + stock + signing_bonus` — rounded to whole
+USD (`null` when the city has no active experiences). This drives location list
+and detail compensation summaries.
 
 ### 3.2 Location detail ✅
 `GET /api/v1/locations/{slug}`
@@ -342,7 +348,8 @@ stats scoped to the city:
       "industry": "Tech",
       "experienceCount": 4,
       "avgWorthScore": 7.5,
-      "avgStress": 6.6
+      "avgStress": 6.6,
+      "avgTotalComp": 220000
     }
   ],
   "next_cursor": null
