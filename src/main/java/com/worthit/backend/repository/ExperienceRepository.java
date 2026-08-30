@@ -35,6 +35,48 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
                                         @Param("active") boolean active);
 
     /**
+     * Aggregate stats for active experiences matching a company + role + submitted level label.
+     */
+    @Query("""
+            select count(e) as experienceCount,
+                   avg(e.worthItScore) as avgWorthScore,
+                   avg(e.stressLevel) as avgStress,
+                   avg(e.baseSalary + e.bonus + e.stock + e.signingBonus) as avgTotalComp
+            from Experience e
+            left join e.level lv
+            where e.company.id = :companyId
+              and e.role.id = :roleId
+              and e.active = true
+              and lower(coalesce(e.levelName, lv.name)) = :levelName
+            """)
+    ExperienceStatsProjection aggregateForCompanyRoleAndLevel(@Param("companyId") Long companyId,
+                                                              @Param("roleId") Long roleId,
+                                                              @Param("levelName") String levelName);
+
+    /**
+     * Aggregate stats for active experiences matching a company + role + submitted level label +
+     * location city name.
+     */
+    @Query("""
+            select count(e) as experienceCount,
+                   avg(e.worthItScore) as avgWorthScore,
+                   avg(e.stressLevel) as avgStress,
+                   avg(e.baseSalary + e.bonus + e.stock + e.signingBonus) as avgTotalComp
+            from Experience e
+            join e.location l
+            left join e.level lv
+            where e.company.id = :companyId
+              and e.role.id = :roleId
+              and e.active = true
+              and lower(coalesce(e.levelName, lv.name)) = :levelName
+              and lower(l.city) = :locationCity
+            """)
+    ExperienceStatsProjection aggregateForCompanyRoleAndLevelAndLocation(@Param("companyId") Long companyId,
+                                                                         @Param("roleId") Long roleId,
+                                                                         @Param("levelName") String levelName,
+                                                                         @Param("locationCity") String locationCity);
+
+    /**
      * Active experiences in a location (see {@code api-endpoints.md} §3.3), with the
      * company eagerly fetched so per-company stats scoped to the city can be computed in memory
      * without an N+1.

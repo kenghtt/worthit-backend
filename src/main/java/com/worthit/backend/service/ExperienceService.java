@@ -2,6 +2,7 @@ package com.worthit.backend.service;
 
 import com.worthit.backend.dto.CreateExperienceRequest;
 import com.worthit.backend.dto.ExperienceSummary;
+import com.worthit.backend.dto.ExperienceStatsSummary;
 import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.entity.Company;
 import com.worthit.backend.entity.EmploymentStatus;
@@ -21,6 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
@@ -86,6 +89,45 @@ public class ExperienceService {
                 .toList();
 
         return paginate(all, cursor, pageSize);
+    }
+
+    /**
+     * Computes aggregate stats across all matching active experiences for the role experiences
+     * page. Company and role are required slugs; level is required and location may further
+     * narrow the result only when level is present.
+     */
+    @Transactional(readOnly = true)
+    public ExperienceStatsSummary getExperienceStats(String companySlug, String roleSlug,
+                                                     String level, String location) {
+        String levelName = normalizeStatsFilter(level);
+        if (levelName == null) {
+            throw new IllegalArgumentException("level is required when requesting experience stats");
+        }
+        String locationCity = normalizeStatsFilter(location);
+
+        Company company = companyRepository.findBySlug(companySlug)
+                .filter(Company::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException("Company not found: " + companySlug));
+        Role role = roleRepository.findBySlug(roleSlug)
+                .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + roleSlug));
+
+        var stats = locationCity == null
+                ? experienceRepository.aggregateForCompanyRoleAndLevel(company.getId(), role.getId(), levelName)
+                : experienceRepository.aggregateForCompanyRoleAndLevelAndLocation(
+                        company.getId(), role.getId(), levelName, locationCity);
+
+        long count = stats.getExperienceCount();
+        return new ExperienceStatsSummary(
+                count,
+                scaleScore(stats.getAvgWorthScore()),
+                scaleScore(stats.getAvgStress()),
+                roundCurrency(stats.getAvgTotalComp())
+        );
+    }
+
+    private String normalizeStatsFilter(String value) {
+        String normalized = blankToNull(value);
+        return normalized == null ? null : normalized.toLowerCase(Locale.ROOT);
     }
 
     /**
@@ -219,6 +261,14 @@ public class ExperienceService {
             default -> throw new IllegalArgumentException(
                     "employmentStatus must be one of: current, former");
         };
+    }
+
+    private static BigDecimal scaleScore(BigDecimal value) {
+        return value == null ? null : value.setScale(1, RoundingMode.HALF_UP);
+    }
+
+    private static Integer roundCurrency(BigDecimal value) {
+        return value == null ? null : value.setScale(0, RoundingMode.HALF_UP).intValue();
     }
 
     private static int normalizeLimit(Integer limit) {

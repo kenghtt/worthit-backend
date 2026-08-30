@@ -2,6 +2,7 @@ package com.worthit.backend.controller;
 
 import com.worthit.backend.dto.CreateExperienceRequest;
 import com.worthit.backend.dto.ExperienceSummary;
+import com.worthit.backend.dto.ExperienceStatsSummary;
 import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.service.ExperienceService;
 import jakarta.validation.Valid;
@@ -44,6 +45,22 @@ public class ExperienceController {
         log.debug("GET /api/v1/experiences company={} role={} city={} cursor={} limit={}",
                 company, role, city, cursor, limit);
         return experienceService.listExperiences(company, role, city, cursor, limit);
+    }
+
+    /**
+     * {@code GET /api/v1/experiences/stats} — aggregate active experience stats for the role
+     * experiences page. Company and role are required slugs; level is required and location is an
+     * optional refinement used only alongside that level filter.
+     */
+    @GetMapping("/stats")
+    public ExperienceStatsSummary getExperienceStats(
+            @RequestParam String company,
+            @RequestParam String role,
+            @RequestParam(required = false) String level,
+            @RequestParam(required = false) String location) {
+        log.debug("GET /api/v1/experiences/stats company={} role={} level={} location={}",
+                company, role, level, location);
+        return experienceService.getExperienceStats(company, role, level, location);
     }
 
     /**
