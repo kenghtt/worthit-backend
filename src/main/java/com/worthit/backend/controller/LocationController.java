@@ -51,7 +51,7 @@ public class LocationController {
     }
 
     /**
-     * {@code GET /api/v1/locations/{slug}/companies} — companies that have published experiences
+     * {@code GET /api/v1/locations/{slug}/companies} — companies that have active experiences
      * in a location, each with per-company stats scoped to the city (see
      * {@code api-endpoints.md} §3.3). Returns {@code 404} (via {@code GlobalExceptionHandler})
      * if no active location has the slug.

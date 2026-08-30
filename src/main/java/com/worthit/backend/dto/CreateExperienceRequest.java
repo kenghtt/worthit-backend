@@ -2,6 +2,7 @@ package com.worthit.backend.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.worthit.backend.validation.WorthItReasonMaxLength;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -42,9 +43,7 @@ public record CreateExperienceRequest(
         @JsonProperty("stressLevel") @NotNull @DecimalMin("0.0") @DecimalMax("10.0") BigDecimal stressLevel,
         @JsonProperty("hoursPerWeek") @Min(0) Short hoursPerWeek,
         @JsonProperty("worthItScore") @NotNull @DecimalMin("0.0") @DecimalMax("10.0") BigDecimal worthItScore,
-        @JsonProperty("whyStay") String whyStay,
-        @JsonProperty("whyLeave") String whyLeave,
-        @JsonProperty("wishKnew") String wishKnew
+        @JsonProperty("worthItReason") @WorthItReasonMaxLength String worthItReason
 ) {
 
     /**

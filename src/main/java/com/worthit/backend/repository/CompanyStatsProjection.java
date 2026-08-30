@@ -3,7 +3,7 @@ package com.worthit.backend.repository;
 import java.math.BigDecimal;
 
 /**
- * Per-company aggregate stats computed from {@code published} experiences
+ * Per-company aggregate stats computed from active experiences
  * (see {@code database-spec.md} §10).
  */
 public interface CompanyStatsProjection {
@@ -17,6 +17,8 @@ public interface CompanyStatsProjection {
     BigDecimal getAvgWorthScore();
 
     BigDecimal getAvgStress();
+
+    BigDecimal getAvgHoursPerWeek();
 
     /** Average total compensation (base + bonus + stock + signing bonus). */
     BigDecimal getAvgTotalComp();

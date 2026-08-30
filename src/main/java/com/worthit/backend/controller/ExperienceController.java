@@ -2,6 +2,7 @@ package com.worthit.backend.controller;
 
 import com.worthit.backend.dto.CreateExperienceRequest;
 import com.worthit.backend.dto.ExperienceSummary;
+import com.worthit.backend.dto.ExperienceStatsSummary;
 import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.service.ExperienceService;
 import jakarta.validation.Valid;
@@ -28,7 +29,7 @@ public class ExperienceController {
     private final ExperienceService experienceService;
 
     /**
-     * {@code GET /api/v1/experiences} — list published experiences filtered by company + role
+     * {@code GET /api/v1/experiences} — list active experiences filtered by company + role
      * (see {@code api-endpoints.md} §2.4), newest first. The {@code company} and {@code role}
      * query params are the company and role slugs; the optional {@code city} filters by location
      * slug. Returns {@code 404} (via {@code GlobalExceptionHandler}) if no active company or role
@@ -47,9 +48,25 @@ public class ExperienceController {
     }
 
     /**
+     * {@code GET /api/v1/experiences/stats} — aggregate active experience stats for the role
+     * experiences page. Company and role are required slugs; level is required and location is an
+     * optional refinement used only alongside that level filter.
+     */
+    @GetMapping("/stats")
+    public ExperienceStatsSummary getExperienceStats(
+            @RequestParam String company,
+            @RequestParam String role,
+            @RequestParam(required = false) String level,
+            @RequestParam(required = false) String location) {
+        log.debug("GET /api/v1/experiences/stats company={} role={} level={} location={}",
+                company, role, level, location);
+        return experienceService.getExperienceStats(company, role, level, location);
+    }
+
+    /**
      * {@code POST /api/v1/experiences} — create a new experience (see {@code api-endpoints.md} §4.1).
-     * The submission is persisted as {@code pending} and does not appear in read endpoints until
-     * moderated/published. Returns {@code 201 Created} with the created experience (§2.4 shape), or
+     * The submission is persisted as inactive and does not appear in read endpoints until activated.
+     * Returns {@code 201 Created} with the created experience (§2.4 shape), or
      * {@code 400} with validation {@code details} (via {@code GlobalExceptionHandler}).
      */
     @PostMapping

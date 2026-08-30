@@ -3,7 +3,7 @@ package com.worthit.backend.repository;
 import java.math.BigDecimal;
 
 /**
- * Per-location aggregate stats computed from {@code published} experiences
+ * Per-location aggregate stats computed from active experiences
  * (see {@code api-endpoints.md} §3.1, {@code database-spec.md} §10).
  */
 public interface LocationStatsProjection {
@@ -17,4 +17,6 @@ public interface LocationStatsProjection {
     BigDecimal getAvgWorthScore();
 
     BigDecimal getAvgStress();
+
+    BigDecimal getAvgTotalComp();
 }

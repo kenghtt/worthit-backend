@@ -16,6 +16,7 @@ public record LocationSummary(
         @JsonProperty("experienceCount") long experienceCount,
         @JsonProperty("companyCount") long companyCount,
         @JsonProperty("avgWorthScore") BigDecimal avgWorthScore,
-        @JsonProperty("avgStress") BigDecimal avgStress
+        @JsonProperty("avgStress") BigDecimal avgStress,
+        @JsonProperty("avgTotalComp") BigDecimal avgTotalComp
 ) {
 }

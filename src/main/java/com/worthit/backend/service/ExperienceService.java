@@ -2,17 +2,15 @@ package com.worthit.backend.service;
 
 import com.worthit.backend.dto.CreateExperienceRequest;
 import com.worthit.backend.dto.ExperienceSummary;
+import com.worthit.backend.dto.ExperienceStatsSummary;
 import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.entity.Company;
-import com.worthit.backend.entity.CompanyRole;
 import com.worthit.backend.entity.EmploymentStatus;
 import com.worthit.backend.entity.Experience;
-import com.worthit.backend.entity.ExperienceStatus;
 import com.worthit.backend.entity.Level;
 import com.worthit.backend.entity.Location;
 import com.worthit.backend.entity.Role;
 import com.worthit.backend.repository.CompanyRepository;
-import com.worthit.backend.repository.CompanyRoleRepository;
 import com.worthit.backend.repository.ExperienceRepository;
 import com.worthit.backend.repository.LevelRepository;
 import com.worthit.backend.repository.LocationRepository;
@@ -24,19 +22,21 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.OptionalInt;
 
 /**
  * Write-side logic for the submit-experience endpoint (see {@code api-endpoints.md} §4.1).
  *
  * <p>Resolves the submitted company / role / location, creating any that don't yet exist
- * (find-or-create, mirroring the seeder's upsert-by-slug approach in {@code DataSeeder}). Since new
- * experiences are persisted as {@code pending} (see {@code database-spec.md} §9), they — and any
- * companies/roles created alongside them — stay out of the public read endpoints until a published
- * experience exists. Records the experience and returns it in the §2.4 shape.</p>
+ * (find-or-create, mirroring the seeder's upsert-by-slug approach in {@code DataSeeder}). New
+ * experiences are persisted as inactive, so they stay out of public read endpoints until someone
+ * explicitly activates them. Records the experience and returns it in the §2.4 shape.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -51,18 +51,17 @@ public class ExperienceService {
     private final RoleRepository roleRepository;
     private final LocationRepository locationRepository;
     private final LevelRepository levelRepository;
-    private final CompanyRoleRepository companyRoleRepository;
     private final ExperienceRepository experienceRepository;
 
     /**
-     * Lists the {@code published} experiences for a company + role (see {@code api-endpoints.md}
+     * Lists the active experiences for a company + role (see {@code api-endpoints.md}
      * §2.4), newest first, optionally filtered to a single city (by location slug). Each item
      * mirrors the {@code experience} DB columns (see {@link ExperienceSummary}).
      *
      * <p>Company and role are supplied as slugs; the matching rows are sorted and paged in
      * memory.</p>
      *
-     * @throws ResourceNotFoundException if no active company or role with the given slug exists
+     * @throws ResourceNotFoundException if no active company or no role with the given slug exists
      */
     @Transactional(readOnly = true)
     public PageResponse<ExperienceSummary> listExperiences(String slug, String roleSlug, String city,
@@ -71,7 +70,6 @@ public class ExperienceService {
                 .filter(Company::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Company not found: " + slug));
         Role role = roleRepository.findBySlug(roleSlug)
-                .filter(Role::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + roleSlug));
         int pageSize = normalizeLimit(limit);
         String citySlug = (city == null || city.isBlank()) ? null : city.trim();
@@ -83,7 +81,7 @@ public class ExperienceService {
                 .reversed();
 
         List<ExperienceSummary> all = experienceRepository
-                .findForCompanyRole(company.getId(), role.getId(), ExperienceStatus.published, true)
+                .findForCompanyRole(company.getId(), role.getId(), true)
                 .stream()
                 .filter(e -> citySlug == null || citySlug.equalsIgnoreCase(e.getLocation().getSlug()))
                 .sorted(newestFirst)
@@ -94,7 +92,46 @@ public class ExperienceService {
     }
 
     /**
-     * Creates a new {@code pending} experience from the submit form (see {@code api-endpoints.md}
+     * Computes aggregate stats across all matching active experiences for the role experiences
+     * page. Company and role are required slugs; level is required and location may further
+     * narrow the result only when level is present.
+     */
+    @Transactional(readOnly = true)
+    public ExperienceStatsSummary getExperienceStats(String companySlug, String roleSlug,
+                                                     String level, String location) {
+        String levelName = normalizeStatsFilter(level);
+        if (levelName == null) {
+            throw new IllegalArgumentException("level is required when requesting experience stats");
+        }
+        String locationCity = normalizeStatsFilter(location);
+
+        Company company = companyRepository.findBySlug(companySlug)
+                .filter(Company::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException("Company not found: " + companySlug));
+        Role role = roleRepository.findBySlug(roleSlug)
+                .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + roleSlug));
+
+        var stats = locationCity == null
+                ? experienceRepository.aggregateForCompanyRoleAndLevel(company.getId(), role.getId(), levelName)
+                : experienceRepository.aggregateForCompanyRoleAndLevelAndLocation(
+                        company.getId(), role.getId(), levelName, locationCity);
+
+        long count = stats.getExperienceCount();
+        return new ExperienceStatsSummary(
+                count,
+                scaleScore(stats.getAvgWorthScore()),
+                scaleScore(stats.getAvgStress()),
+                roundCurrency(stats.getAvgTotalComp())
+        );
+    }
+
+    private String normalizeStatsFilter(String value) {
+        String normalized = blankToNull(value);
+        return normalized == null ? null : normalized.toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Creates a new inactive experience from the submit form (see {@code api-endpoints.md}
      * §4.1). Bean Validation on {@link CreateExperienceRequest} has already run; this method handles
      * the remaining domain mapping and entity resolution.
      *
@@ -105,11 +142,9 @@ public class ExperienceService {
     public ExperienceSummary createExperience(CreateExperienceRequest req) {
         Company company = resolveCompany(req);
         Role role = resolveRole(req);
-        linkCompanyRoleIfMissing(company, role);
         Location location = resolveLocation(req);
 
-        Level level = (req.level() == null || req.level().isBlank()) ? null
-                : levelRepository.findByCompany_IdAndName(company.getId(), req.level().trim()).orElse(null);
+        Level level = resolveLevel(company, req.level());
 
         Experience experience = Experience.builder()
                 .company(company)
@@ -128,14 +163,40 @@ public class ExperienceService {
                 .stressLevel(req.stressLevel())
                 .hoursPerWeek(req.hoursPerWeek())
                 .worthItScore(req.worthItScore())
-                .whyStay(blankToNull(req.whyStay()))
-                .whyLeave(blankToNull(req.whyLeave()))
-                .wishKnew(blankToNull(req.wishKnew()))
-                .status(ExperienceStatus.pending)
+                .worthItReason(blankToNull(req.worthItReason()))
                 .active(false)
                 .build();
 
         return ExperienceSummary.from(experienceRepository.save(experience));
+    }
+
+    /**
+     * Resolves a company-specific level by exact submitted name, creating a new inactive row when
+     * the user provides a level that does not yet exist. Newly created levels append after the
+     * highest saved rank for the company; if the company has no levels yet, they append after the
+     * backend default fallback ladder.
+     */
+    private Level resolveLevel(Company company, String requestedLevel) {
+        String levelName = blankToNull(requestedLevel);
+        if (levelName == null) {
+            return null;
+        }
+
+        return levelRepository.findByCompany_IdAndName(company.getId(), levelName)
+                .orElseGet(() -> levelRepository.save(Level.builder()
+                        .company(company)
+                        .name(levelName)
+                        .normalizedRank(nextNormalizedRank(company))
+                        .active(false)
+                        .build()));
+    }
+
+    private int nextNormalizedRank(Company company) {
+        OptionalInt highestSavedRank = levelRepository.findByCompany_IdOrderByNormalizedRankAsc(company.getId())
+                .stream()
+                .mapToInt(Level::getNormalizedRank)
+                .max();
+        return highestSavedRank.orElse(LevelCatalog.highestDefaultNormalizedRank()) + 1;
     }
 
     /**
@@ -150,13 +211,13 @@ public class ExperienceService {
                 .orElseGet(() -> companyRepository.save(Company.builder()
                         .slug(slug)
                         .name(displayName)
-                        .active(true)
+                        .active(false)
                         .build()));
     }
 
     /**
      * Resolves the role by {@code roleSlug} (or the slugified display name / custom role), creating
-     * an active global role if none exists yet. {@code customRole} takes precedence as the display
+     * an inactive global role if none exists yet. {@code customRole} takes precedence as the display
      * name when the user typed a role not in the list.
      */
     private Role resolveRole(CreateExperienceRequest req) {
@@ -169,19 +230,8 @@ public class ExperienceService {
                 .orElseGet(() -> roleRepository.save(Role.builder()
                         .slug(slug)
                         .name(name)
-                        .active(true)
+                        .active(false)
                         .build()));
-    }
-
-    /** Ensures the role is offered at the company (see {@code database-spec.md} §5). */
-    private void linkCompanyRoleIfMissing(Company company, Role role) {
-        if (!companyRoleRepository.existsByCompany_IdAndRole_Id(company.getId(), role.getId())) {
-            companyRoleRepository.save(CompanyRole.builder()
-                    .company(company)
-                    .role(role)
-                    .active(true)
-                    .build());
-        }
     }
 
     /**
@@ -196,7 +246,7 @@ public class ExperienceService {
                         .slug(SlugUtil.slugify(city + " " + state))
                         .city(city)
                         .state(state)
-                        .active(true)
+                        .active(false)
                         .build()));
     }
 
@@ -211,6 +261,14 @@ public class ExperienceService {
             default -> throw new IllegalArgumentException(
                     "employmentStatus must be one of: current, former");
         };
+    }
+
+    private static BigDecimal scaleScore(BigDecimal value) {
+        return value == null ? null : value.setScale(1, RoundingMode.HALF_UP);
+    }
+
+    private static Integer roundCurrency(BigDecimal value) {
+        return value == null ? null : value.setScale(0, RoundingMode.HALF_UP).intValue();
     }
 
     private static int normalizeLimit(Integer limit) {

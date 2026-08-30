@@ -114,13 +114,13 @@ Returns `Page<CompanySummary>`:
 `avgHoursPerWeek` is the mean of reported weekly hours (one decimal, `null` if
 none report hours). `avgTotalComp` is the mean **total** compensation per
 experience — the sum of `base_salary + bonus + stock + signing_bonus` — rounded
-to whole USD (`null` when the company has no published experiences). These power
+to whole USD (`null` when the company has no active experiences). These power
 the companies table's *Hours/week* and *Median Comp* columns.
 
 Used by: companies list page, homepage company typeahead/search.
 
 Behavior note:
-- When `includeZeroExperience` is omitted/`false`, the list excludes companies with no published experiences (`experienceCount = 0`) to keep the default browse table focused.
+- When `includeZeroExperience` is omitted/`false`, the list excludes companies with no active experiences (`experienceCount = 0`) to keep the default browse table focused.
 - When `includeZeroExperience=true`, matching companies are returned regardless of experience count (recommended when the user enters a search query).
 
 ### 2.2 Company detail ✅
@@ -150,11 +150,10 @@ Query params (all optional):
 | `cursor` | string | Pagination cursor.   |
 | `limit`  | int    | Page size.           |
 
-Returns `Page<RoleSummary>` — the roles available at the company (driven by the
-`company_role` join, see `database-spec.md` §5), each with per-role aggregate
-stats computed from the company's `published` experiences. Salary figures are
+Returns `Page<RoleSummary>` — the company-role cards derived from the company's
+active experiences, each with per-role aggregate stats. Salary figures are
 whole USD, where `baseSalaryAverage` is the mean of the role's base salaries
-(sum ÷ count); a role with no published experiences yet is still listed with
+(sum ÷ count); a role with no active experiences yet is still listed with
 `null` stats and `experienceCount: 0`. `404` if the slug does not exist.
 
 ```json
@@ -195,19 +194,18 @@ Query params (all optional):
 | `limit`   | int    | Page size (default `20`, max `50`).          |
 
 Returns `Page<ExperienceSummary>`, newest first (`created_at` desc, `id` desc
-tiebreaker), restricted to experiences where `status = published` **and**
-`active = true`. Each item **mirrors the
+tiebreaker), restricted to experiences where `active = true`. Each item **mirrors the
 `experience` DB columns** (see `database-spec.md` §8) rather than the UI's mock
 field names: field keys come from the global `snake_case` Jackson strategy
-(e.g. `worth_it_score`, `stress_level`, `wish_knew`, `created_at`), and the
+(e.g. `worth_it_score`, `stress_level`, `worth_it_reason`, `created_at`), and the
 foreign keys are expanded into their natural identifiers (company/role slug +
 name, location slug/city/state, level name). Internal DB primary keys are **not**
 included (see §1 "Internal IDs").
 
 `employment_status` is the DB enum value — one of `current` / `past` (note:
 `past`, not `former`). These fields are nullable and serialize as `null` when
-unset: `level_name`, `years_at_company`, `hours_per_week`, `why_stay`,
-`why_leave`, `wish_knew`. `created_at` is an ISO-8601 timestamp (UTC).
+unset: `level_name`, `years_at_company`, `hours_per_week`, `worth_it_reason`.
+`created_at` is an ISO-8601 timestamp (UTC).
 
 ```json
 {
@@ -233,9 +231,7 @@ unset: `level_name`, `years_at_company`, `hours_per_week`, `why_stay`,
       "hours_per_week": 45,
       "worth_it_score": 7.5,
       "active": true,
-      "why_stay": "Strong comp and learning.",
-      "why_leave": "On-call burnout.",
-      "wish_knew": "Ask about on-call rotation before joining.",
+      "worth_it_reason": "Ask about on-call rotation before joining.",
       "created_at": "2026-05-01T12:00:00Z"
     }
   ],
@@ -243,10 +239,9 @@ unset: `level_name`, `years_at_company`, `hours_per_week`, `why_stay`,
 }
 ```
 
-> The role list / role slug comes from §2.3, passed here as the `role` query
-> param. `404` if the `company` slug or `role` slug does not exist, or if the
-> role is not offered at the company (no `company_role` link); an unknown `city`
-> slug yields an empty page (not a 404).
+> The role slug usually comes from the global role lookup in §2.6 and is passed
+> here as the `role` query param. `404` if the `company` slug or `role` slug
+> does not exist; an unknown `city` slug yields an empty page (not a 404).
 
 Used by: experiences list page + individual experience modal.
 
@@ -316,7 +311,8 @@ Returns `Page<LocationSummary>`:
       "experienceCount": 12,
       "companyCount": 6,
       "avgWorthScore": 7.6,
-      "avgStress": 6.4
+      "avgStress": 6.4,
+      "avgTotalComp": 185000
     }
   ],
   "next_cursor": null
@@ -324,8 +320,13 @@ Returns `Page<LocationSummary>`:
 ```
 
 Behavior note:
-- When `includeZeroExperience` is omitted/`false`, the list excludes cities with no published experiences (`experienceCount = 0`) to keep the default browse table focused.
+- When `includeZeroExperience` is omitted/`false`, the list excludes cities with no active experiences (`experienceCount = 0`) to keep the default browse table focused.
 - When `includeZeroExperience=true`, matching cities are returned regardless of experience count (recommended when the user enters a search query).
+
+`avgTotalComp` is the mean **total** compensation per experience in that city —
+the sum of `base_salary + bonus + stock + signing_bonus` — rounded to whole
+USD (`null` when the city has no active experiences). This drives location list
+and detail compensation summaries.
 
 ### 3.2 Location detail ✅
 `GET /api/v1/locations/{slug}`
@@ -347,7 +348,8 @@ stats scoped to the city:
       "industry": "Tech",
       "experienceCount": 4,
       "avgWorthScore": 7.5,
-      "avgStress": 6.6
+      "avgStress": 6.6,
+      "avgTotalComp": 220000
     }
   ],
   "next_cursor": null
@@ -364,8 +366,8 @@ Used by: location detail page.
 `POST /api/v1/experiences`
 
 Creates a new experience. The UI's multi-step form
-(`worthit/src/components/SubmitExperience.jsx`) currently only `console.log`s
-its `formData`; this endpoint is its target.
+(`worthit/src/components/SubmitExperience.jsx`) posts its camelCase `formData`
+here after mapping lookup selections into the request shape.
 
 **Request body** (maps the form's `formData` to DB columns; numbers are whole
 USD, scores 0.0–10.0):
@@ -391,17 +393,22 @@ USD, scores 0.0–10.0):
   "stressLevel": 6.5,
   "hoursPerWeek": 45,
   "worthItScore": 7.5,
-  "whyStay": "Strong comp and learning.",
-  "whyLeave": "On-call burnout.",
-  "wishKnew": "Ask about on-call rotation before joining."
+  "worthItReason": "Ask about on-call rotation before joining."
 }
 ```
 
 Mapping notes:
-- `company`/`role` may be sent as either an existing slug or a display name; if
-  the company/role is new, the backend can create it (or reject — decide
-  moderation policy). `customRole` is used when the user typed a role not in the
-  list.
+- `company`/`role` may be sent as either an existing slug or a display name; the
+  submit form uses global roles from `GET /api/v1/roles`, and `customRole` is
+  used when the user typed a role not in that list.
+- New roles created during submit are stored in the global `role` table with
+  `active = false`; the submit path no longer creates `company_role` links.
+- `level` is always the user-visible level/title string. If it matches an
+  existing company `level` row, the backend reuses that row; otherwise it creates
+  a new inactive `level` row for the company and still snapshots the submitted
+  text in `experience.level_name`.
+- `worthItReason` is optional and, by default, limited to `1000` characters;
+  the backend reads this cap from `app.submit.worth-it-reason-max-length`.
 - The form's culture sliders (`autonomy`, `coding`, `meetings`,
   `firefighting`, `micromanagement`, `psychologicalSafety`, `feedbackQuality`,
   `growthOpportunities`, `followManager`, `reviews`) are collected by the UI but
@@ -412,14 +419,14 @@ Mapping notes:
 - `companySlug`/`company`, `role`/`customRole`, `city` required.
 - `baseSalary` required, `>= 0`; `bonus`/`stock`/`signingBonus` `>= 0`.
 - `stressLevel`, `worthItScore` within `0.0–10.0`.
+- `worthItReason` optional, max length = configured `app.submit.worth-it-reason-max-length` (default `1000`).
 - `employmentStatus` ∈ {`current`, `former`}.
 
 **Response:** `201 Created` with the created experience (same shape as §2.4, without
 internal DB ids — see §1 "Internal IDs"), or `400` with validation `details`.
 
-New experiences are created with `status = pending` and `active = false` (see
-`database-spec.md` §9) and therefore do **not** appear in read endpoints until
-both status is set to `published` and active is set to `true` by moderation.
+New experiences are created with `active = false` and therefore do **not**
+appear in read endpoints until someone explicitly activates them.
 
 ---
 
@@ -438,8 +445,10 @@ form can use free text), but recommended:
 Name-sorted; accepts optional `cursor` + `limit` (see §1).
 
 `GET /api/v1/companies/{slug}/levels` returns `Page<LevelSummary>` with levels
-ordered by `normalizedRank` ascending (`name`, `normalizedRank`). `404` if the
-company slug does not exist. Accepts optional `cursor` + `limit` (see §1).
+ordered by `normalizedRank` ascending (`name`, `normalizedRank`). If the company
+has active `level` rows, those rows are returned; otherwise the backend returns
+its default ladder (`Junior`, `Mid`, `Senior`, `Staff`, `Principal`). `404` if
+the company slug does not exist. Accepts optional `cursor` + `limit` (see §1).
 
 ---
 

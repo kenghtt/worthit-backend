@@ -8,13 +8,13 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 /**
- * A single published experience for a company + role (see {@code api-endpoints.md} §2.4).
+ * A single active experience for a company + role (see {@code api-endpoints.md} §2.4).
  *
  * <p>Unlike the company/role summary DTOs, this one is shaped to mirror the {@code experience}
  * DB columns (see {@code database-spec.md} §8) rather than the UI's mock field names: it relies
  * on the global {@code snake_case} Jackson strategy, so e.g. {@code worthItScore} serializes as
- * {@code worth_it_score}, {@code stressLevel} as {@code stress_level}, {@code wishKnew} as
- * {@code wish_knew}, and {@code createdAt} as {@code created_at} (ISO-8601). Foreign-key relations
+ * {@code worth_it_score}, {@code stressLevel} as {@code stress_level}, {@code worthItReason} as
+ * {@code worth_it_reason}, and {@code createdAt} as {@code created_at} (ISO-8601). Foreign-key relations
  * are exposed via their natural identifiers (company/role slug + name, location slug/city/state,
  * level name). Internal DB primary keys (e.g. {@code experience.id}) are never included in API
  * responses (see {@code api-endpoints.md} §1).</p>
@@ -40,9 +40,7 @@ public record ExperienceSummary(
         Short hoursPerWeek,
         BigDecimal worthItScore,
         boolean active,
-        String whyStay,
-        String whyLeave,
-        String wishKnew,
+        String worthItReason,
         OffsetDateTime createdAt
 ) {
 
@@ -79,9 +77,7 @@ public record ExperienceSummary(
                 e.getHoursPerWeek(),
                 e.getWorthItScore(),
                 e.isActive(),
-                e.getWhyStay(),
-                e.getWhyLeave(),
-                e.getWishKnew(),
+                e.getWorthItReason(),
                 e.getCreatedAt()
         );
     }

@@ -7,7 +7,6 @@ import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.dto.RoleSummary;
 import com.worthit.backend.entity.Company;
 import com.worthit.backend.entity.Experience;
-import com.worthit.backend.entity.ExperienceStatus;
 import com.worthit.backend.entity.Level;
 import com.worthit.backend.entity.Role;
 import com.worthit.backend.exception.ResourceNotFoundException;
@@ -36,7 +35,7 @@ import java.util.stream.Collectors;
  * list/search, company detail, search-bar typeahead, per-company roles, and the experiences for
  * a company + role.
  *
- * <p>Aggregate stats are computed from {@code published} experiences. Given the current data
+ * <p>Aggregate stats are computed from active experiences. Given the current data
  * size results are filtered/sorted/paged in memory (see {@link #paginate}), which keeps support
  * for sorting by derived aggregates (worth score, experience count) straightforward.</p>
  */
@@ -67,7 +66,7 @@ public class CompanyService {
         boolean includeZeroExp = Boolean.TRUE.equals(includeZeroExperience);
 
         Map<Long, CompanyStatsProjection> statsByCompany = experienceRepository
-                .aggregateByCompany(ExperienceStatus.published, true)
+                .aggregateByCompany(true)
                 .stream()
                 .collect(Collectors.toMap(CompanyStatsProjection::getCompanyId, Function.identity()));
 
@@ -141,7 +140,7 @@ public class CompanyService {
 
     /**
      * Lists per-role aggregates for a company (see {@code api-endpoints.md} §2.3), based only on
-     * experiences visible in public reads ({@code status=published && active=true}).
+     * experiences visible in public reads ({@code active=true}).
      *
      * <p>This keeps the "Experience by role" table aligned with real data: roles with zero
      * qualifying experiences are omitted instead of being shown with placeholder/unknown stats.</p>
@@ -160,7 +159,7 @@ public class CompanyService {
         int pageSize = normalizeLimit(limit);
 
         Map<Long, List<Experience>> experiencesByRole = experienceRepository
-                .findByCompany_IdAndStatusAndActive(company.getId(), ExperienceStatus.published, true)
+                .findByCompany_IdAndActive(company.getId(), true)
                 .stream()
                 .collect(Collectors.groupingBy(e -> e.getRole().getId()));
 
@@ -177,7 +176,8 @@ public class CompanyService {
 
     /**
      * Lists the level options for a company's submit-form level picker (see {@code api-endpoints.md}
-     * §5), ordered by {@code normalizedRank} ascending. Returns {@code 404} if no active company
+     * §5), ordered by {@code normalizedRank} ascending. If the company has no active level rows,
+     * falls back to the backend-managed default ladder. Returns {@code 404} if no active company
      * has the slug.
      *
      * @throws ResourceNotFoundException if no active company with the slug exists
@@ -195,23 +195,21 @@ public class CompanyService {
                 .map(l -> new LevelSummary(l.getName(), l.getNormalizedRank()))
                 .toList();
 
+        if (all.isEmpty()) {
+            all = LevelCatalog.DEFAULT_LEVELS;
+        }
+
         return paginate(all, cursor, pageSize);
     }
 
     private RoleSummary toRoleSummary(Role role, List<Experience> experiences) {
-        Integer salaryMin = experiences.isEmpty() ? null
-                : experiences.stream().mapToInt(Experience::getBaseSalary).min().getAsInt();
-        Integer salaryMax = experiences.isEmpty() ? null
-                : experiences.stream().mapToInt(Experience::getBaseSalary).max().getAsInt();
         return new RoleSummary(
                 role.getSlug(),
                 role.getName(),
                 experiences.size(),
                 averageScore(experiences, Experience::getWorthItScore),
                 averageScore(experiences, Experience::getStressLevel),
-                salaryMin,
-                salaryMax,
-                averageSalary(experiences)
+                averageTotalComp(experiences)
         );
     }
 
@@ -226,12 +224,13 @@ public class CompanyService {
         return sum.divide(BigDecimal.valueOf(experiences.size()), 1, RoundingMode.HALF_UP);
     }
 
-    private static Integer averageSalary(List<Experience> experiences) {
+    private static Integer averageTotalComp(List<Experience> experiences) {
         if (experiences.isEmpty()) {
             return null;
         }
-        // Sum as long to avoid overflow, then divide by count and round to whole USD.
-        long sum = experiences.stream().mapToLong(Experience::getBaseSalary).sum();
+        long sum = experiences.stream()
+                .mapToLong(e -> (long) e.getBaseSalary() + e.getBonus() + e.getStock() + e.getSigningBonus())
+                .sum();
         return (int) Math.round((double) sum / experiences.size());
     }
 
@@ -240,6 +239,7 @@ public class CompanyService {
         long roleCount = stats == null ? 0L : stats.getRoleCount();
         BigDecimal avgWorth = stats == null ? null : scale(stats.getAvgWorthScore());
         BigDecimal avgStress = stats == null ? null : scale(stats.getAvgStress());
+        BigDecimal avgHoursPerWeek = stats == null ? null : scale(stats.getAvgHoursPerWeek());
         BigDecimal avgTotalComp = stats == null || stats.getAvgTotalComp() == null
                 ? null
                 : stats.getAvgTotalComp().setScale(0, RoundingMode.HALF_UP);
@@ -252,6 +252,7 @@ public class CompanyService {
                 roleCount,
                 avgWorth,
                 avgStress,
+                avgHoursPerWeek,
                 avgTotalComp
         );
     }

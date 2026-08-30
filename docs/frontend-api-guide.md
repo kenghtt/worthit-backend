@@ -81,7 +81,7 @@ response) use **snake_case** because they mirror DB columns:
 | `base_salary`, `bonus`, `stock`, `signing_bonus` | Whole USD |
 | `employment_status` | `"current"` or `"past"` (see note below) |
 | `created_at` | ISO-8601 UTC timestamp |
-| `why_stay`, `why_leave`, `wish_knew` | Free text (nullable) |
+| `worth_it_reason` | Optional free text explaining the score |
 
 **POST request bodies** use **camelCase** (`worthItScore`, `employmentStatus`, …).
 
@@ -121,7 +121,7 @@ Common statuses: `404` missing slug, `400` validation, `201` created experience.
 | GET | `/api/v1/companies/search` | Lightweight company typeahead | Home search bar ✅ live |
 | GET | `/api/v1/companies/{slug}` | Company profile (no stats) | Company detail header |
 | GET | `/api/v1/companies/{slug}/roles` | Roles at company + per-role stats | Company detail role cards |
-| GET | `/api/v1/experiences` | Published experiences filtered by company + role | Experiences list, experience modal |
+| GET | `/api/v1/experiences` | Active experiences filtered by company + role | Experiences list, experience modal |
 | GET | `/api/v1/locations` | List/search cities with stats | Locations list, Home |
 | GET | `/api/v1/locations/{slug}` | Single city stats | Location detail header |
 | GET | `/api/v1/locations/{slug}/companies` | Companies with experiences in that city | Location detail company list |
@@ -141,7 +141,7 @@ and `/levels`.
 ### List / search companies
 
 **Purpose:** Full companies browse page — filter, sort, and paginate companies with
-aggregate stats from **published** experiences.
+aggregate stats from **active** experiences.
 
 ```
 GET /api/v1/companies
@@ -180,7 +180,7 @@ GET /api/v1/companies
 
 `avgHoursPerWeek` (mean reported weekly hours, one decimal, `null` if none) and
 `avgTotalComp` (mean of `base_salary + bonus + stock + signing_bonus` per
-experience, whole USD, `null` when no published experiences) populate the
+experience, whole USD, `null` when no active experiences) populate the
 companies table's **Hours/week** and **Median Comp** columns.
 
 **UI:** `CompaniesPage`, Home featured companies.
@@ -188,7 +188,7 @@ companies table's **Hours/week** and **Median Comp** columns.
 **Client:** `listCompanies(params)` in `companyApi.js`.
 
 **Recommended usage:**
-- Default browse list (no search text): send `includeZeroExperience=false` so the table does not get flooded by companies without published experiences.
+- Default browse list (no search text): send `includeZeroExperience=false` so the table does not get flooded by companies without active experiences.
 - Search mode (search text present): send `includeZeroExperience=true` so manually searched companies can still appear even when their current `experienceCount` is `0`.
 
 > **Backend note:** the controller currently binds the search string as query param
@@ -240,7 +240,7 @@ GET /api/v1/companies/{slug}
 ### Company roles
 
 **Purpose:** Role cards on the company page — each role offered at the company with stats
-from **published** experiences at that company.
+from **active** experiences at that company.
 
 ```
 GET /api/v1/companies/{slug}/roles?cursor=&limit=
@@ -266,7 +266,7 @@ GET /api/v1/companies/{slug}/roles?cursor=&limit=
 }
 ```
 
-Roles with no published experiences still appear with `experienceCount: 0` and `null`
+Roles with no active experiences still appear with `experienceCount: 0` and `null`
 salary/score fields.
 
 **Errors:** `404` if company slug unknown.
@@ -279,8 +279,8 @@ salary/score fields.
 
 ### Experiences for company + role
 
-**Purpose:** Paginated list of experiences for a company/role pair that are both
-**published** and **active**. Powers
+**Purpose:** Paginated list of experiences for a company/role pair that are
+**active**. Powers
 the experiences list and the individual experience modal (pass an item from the list — no
 separate detail endpoint).
 
@@ -300,10 +300,11 @@ query params (slugs) rather than path segments.
 
 **Response:** `Page<ExperienceSummary>` (snake_case fields — see [Conventions](#json-field-naming)).
 
-Only experiences with `status=published` and `active=true` are returned.
+Only experiences with `active=true` are returned.
 
-**Errors:** `404` if company or role slug invalid, or role not linked to company. Unknown
-`city` slug → empty page (not 404).
+**Errors:** `404` if company slug is invalid or the role slug does not exist. Unknown
+`city` slug → empty page (not 404). A role can still resolve here even when its lookup row is
+inactive, as long as active experiences already reference that slug.
 
 **UI:** `ExperiencesList.jsx`, `IndividualExperienceModal`, `RoleDetail.jsx`.
 
@@ -317,10 +318,12 @@ Only experiences with `status=published` and `active=true` are returned.
 | `stress` | `stress_level` |
 | `equity` | `stock` |
 | `hoursMin` / `hoursMax` | `hours_per_week` (single value today) |
-| `whatWasItLike` | `why_stay` / `why_leave` |
-| `advice` | `wish_knew` |
+| `worthItReason` | `worth_it_reason` |
 | `submittedDate` | format from `created_at` |
 | `active` | `active` |
+| `company` | `company_name` |
+| `role` | `role_name` |
+| `level` | `level_name` |
 | `location` | `` `${city}, ${state}` `` |
 
 ---
@@ -330,7 +333,7 @@ Only experiences with `status=published` and `active=true` are returned.
 ### List / search locations
 
 **Purpose:** Locations browse page and Home location chips — cities with aggregate stats
-from **published** experiences.
+from **active** experiences.
 
 ```
 GET /api/v1/locations?q=&includeZeroExperience=&cursor=&limit=
@@ -353,7 +356,8 @@ GET /api/v1/locations?q=&includeZeroExperience=&cursor=&limit=
       "experienceCount": 12,
       "companyCount": 6,
       "avgWorthScore": 7.6,
-      "avgStress": 6.4
+      "avgStress": 6.4,
+      "avgTotalComp": 185000
     }
   ],
   "next_cursor": null
@@ -364,8 +368,11 @@ GET /api/v1/locations?q=&includeZeroExperience=&cursor=&limit=
 
 **Client:** `listLocations(params)`.
 
+`avgTotalComp` is the average of `base_salary + bonus + stock + signing_bonus`
+for the active experiences in that city, rounded to whole USD.
+
 **Recommended usage:**
-- Default browse list (no search text): send `includeZeroExperience=false` so the table does not get flooded by cities without published experiences.
+- Default browse list (no search text): send `includeZeroExperience=false` so the table does not get flooded by cities without active experiences.
 - Search mode (search text present): send `includeZeroExperience=true` so manually searched cities can still appear even when their current `experienceCount` is `0`.
 
 ---
@@ -390,7 +397,7 @@ GET /api/v1/locations/{slug}
 
 ### Companies in a location
 
-**Purpose:** Companies that have **published** experiences in this city, with stats
+**Purpose:** Companies that have **active** experiences in this city, with stats
 scoped to that city.
 
 ```
@@ -408,12 +415,16 @@ GET /api/v1/locations/{slug}/companies?cursor=&limit=
       "industry": "Tech",
       "experienceCount": 4,
       "avgWorthScore": 7.5,
-      "avgStress": 6.6
+      "avgStress": 6.6,
+      "avgTotalComp": 220000
     }
   ],
   "next_cursor": null
 }
 ```
+
+Each company row's `avgTotalComp` is scoped only to the active experiences from
+that city.
 
 **Errors:** `404` if location slug unknown.
 
@@ -428,8 +439,8 @@ GET /api/v1/locations/{slug}/companies?cursor=&limit=
 ### Create experience
 
 **Purpose:** Persist a user submission from the multi-step submit form. New rows are
-saved as **`pending`** — they do **not** appear in any read endpoint until moderated/
-published.
+saved as **inactive** — they do **not** appear in any read endpoint until someone
+activates them.
 
 ```
 POST /api/v1/experiences
@@ -459,16 +470,18 @@ Content-Type: application/json
   "stressLevel": 6.5,
   "hoursPerWeek": 45,
   "worthItScore": 7.5,
-  "whyStay": "Strong comp and learning.",
-  "whyLeave": "On-call burnout.",
-  "wishKnew": "Ask about on-call rotation before joining."
+  "worthItReason": "Ask about on-call rotation before joining."
 }
 ```
 
 | Rule | Detail |
 |------|--------|
 | Company | Provide `companySlug` and/or `company` (display name). Backend find-or-creates. |
-| Role | Provide `role`, `roleSlug`, and/or `customRole`. |
+| Role | Provide `role`, `roleSlug`, and/or `customRole`; saved options come from `GET /api/v1/roles`. |
+| New role moderation | If the user enters a new role through `Other`, the backend creates a global `role` row with `active = false`. |
+| Level | Provide `level` as the display string selected from `GET /api/v1/companies/{slug}/levels`, or the text typed through `Other`. |
+| New level moderation | If the submitted level does not match an existing company level, the backend creates an inactive `level` row for that company and preserves the submitted text in `experience.level_name`. |
+| `worthItReason` | Optional; max `1000` characters by default, matching backend property `app.submit.worth-it-reason-max-length`. |
 | Required fields | `city`, `employmentStatus`, `yearsExperience`, `baseSalary`, `compensationYear`, `stressLevel`, `worthItScore` |
 | `employmentStatus` | `"current"` or `"former"` |
 | Scores | `stressLevel`, `worthItScore` in 0.0–10.0 |
@@ -479,7 +492,7 @@ Content-Type: application/json
 
 **Errors:** `400` with `details` array on validation failure.
 
-**UI:** `SubmitExperience.jsx` — replace `console.log(formData)`; on success navigate to `/`.
+**UI:** `SubmitExperience.jsx` — posts the mapped form payload; on success navigate to `/`.
 
 **Suggested client** (`experienceApi.js`):
 
@@ -517,7 +530,9 @@ GET /api/v1/roles?cursor=&limit=
 GET /api/v1/companies/{slug}/levels?cursor=&limit=
 ```
 
-**Response:** `Page<LevelSummary>` — `name`, `normalizedRank` (ascending).
+**Response:** `Page<LevelSummary>` — `name`, `normalizedRank` (ascending). If the
+company has active saved levels, those are returned; otherwise the backend
+returns its default ladder (`Junior`, `Mid`, `Senior`, `Staff`, `Principal`).
 
 **Errors:** `404` if company slug unknown.
 
