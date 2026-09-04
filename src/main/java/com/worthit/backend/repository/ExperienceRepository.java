@@ -70,11 +70,13 @@ public interface ExperienceRepository extends JpaRepository<Experience, Long> {
               and e.active = true
               and lower(coalesce(e.levelName, lv.name)) = :levelName
               and lower(l.city) = :locationCity
+              and lower(l.state) = :locationState
             """)
     ExperienceStatsProjection aggregateForCompanyRoleAndLevelAndLocation(@Param("companyId") Long companyId,
                                                                          @Param("roleId") Long roleId,
                                                                          @Param("levelName") String levelName,
-                                                                         @Param("locationCity") String locationCity);
+                                                                         @Param("locationCity") String locationCity,
+                                                                         @Param("locationState") String locationState);
 
     /**
      * Active experiences in a location (see {@code api-endpoints.md} §3.3), with the

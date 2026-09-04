@@ -16,10 +16,10 @@ import java.time.OffsetDateTime;
  * {@code worth_it_score}, {@code stressLevel} as {@code stress_level}, {@code worthItReason} as
  * {@code worth_it_reason}, and {@code createdAt} as {@code created_at} (ISO-8601). Foreign-key relations
  * are exposed via their natural identifiers (company/role slug + name, location slug/city/state,
- * level name). Internal DB primary keys (e.g. {@code experience.id}) are never included in API
- * responses (see {@code api-endpoints.md} §1).</p>
+ * level name). The experience ID is included as stable row identity for paginated UI lists.</p>
  */
 public record ExperienceSummary(
+        Long id,
         String companySlug,
         String companyName,
         String roleSlug,
@@ -57,6 +57,7 @@ public record ExperienceSummary(
         String levelName = e.getLevelName() != null ? e.getLevelName()
                 : (e.getLevel() != null ? e.getLevel().getName() : null);
         return new ExperienceSummary(
+                e.getId(),
                 e.getCompany().getSlug(),
                 e.getCompany().getName(),
                 e.getRole().getSlug(),

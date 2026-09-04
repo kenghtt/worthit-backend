@@ -3,6 +3,8 @@ package com.worthit.backend.service;
 import com.worthit.backend.dto.CreateExperienceRequest;
 import com.worthit.backend.dto.ExperienceSummary;
 import com.worthit.backend.dto.ExperienceStatsSummary;
+import com.worthit.backend.dto.ExperienceFilterOptions;
+import com.worthit.backend.dto.ExperienceLocationOption;
 import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.entity.Company;
 import com.worthit.backend.entity.EmploymentStatus;
@@ -28,6 +30,7 @@ import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.OptionalInt;
 
 /**
@@ -55,8 +58,8 @@ public class ExperienceService {
 
     /**
      * Lists the active experiences for a company + role (see {@code api-endpoints.md}
-     * §2.4), newest first, optionally filtered to a single city (by location slug). Each item
-     * mirrors the {@code experience} DB columns (see {@link ExperienceSummary}).
+     * §2.4), newest first, optionally filtered by level and a city/state pair. Each item mirrors
+     * the {@code experience} DB columns (see {@link ExperienceSummary}).
      *
      * <p>Company and role are supplied as slugs; the matching rows are sorted and paged in
      * memory.</p>
@@ -64,15 +67,18 @@ public class ExperienceService {
      * @throws ResourceNotFoundException if no active company or no role with the given slug exists
      */
     @Transactional(readOnly = true)
-    public PageResponse<ExperienceSummary> listExperiences(String slug, String roleSlug, String city,
-                                                           String cursor, Integer limit) {
+    public PageResponse<ExperienceSummary> listExperiences(String slug, String roleSlug, String level,
+                                                           String city, String state, String cursor,
+                                                           Integer limit) {
         Company company = companyRepository.findBySlug(slug)
                 .filter(Company::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Company not found: " + slug));
         Role role = roleRepository.findBySlug(roleSlug)
                 .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + roleSlug));
         int pageSize = normalizeLimit(limit);
-        String citySlug = (city == null || city.isBlank()) ? null : city.trim();
+        String levelName = normalizeStatsFilter(level);
+        String cityName = normalizeLocationPair(city, state);
+        String stateName = cityName == null ? null : state.trim();
 
         // Newest first, with id as a stable tiebreaker so cursor paging is deterministic.
         Comparator<Experience> newestFirst = Comparator
@@ -83,12 +89,52 @@ public class ExperienceService {
         List<ExperienceSummary> all = experienceRepository
                 .findForCompanyRole(company.getId(), role.getId(), true)
                 .stream()
-                .filter(e -> citySlug == null || citySlug.equalsIgnoreCase(e.getLocation().getSlug()))
+                .filter(e -> levelName == null || levelName.equals(normalizedLevelName(e)))
+                .filter(e -> cityName == null
+                        || (cityName.equalsIgnoreCase(e.getLocation().getCity())
+                        && stateName.equalsIgnoreCase(e.getLocation().getState())))
                 .sorted(newestFirst)
                 .map(ExperienceSummary::from)
                 .toList();
 
         return paginate(all, cursor, pageSize);
+    }
+
+    /**
+     * Returns complete, distinct table-filter choices for an active company/role slice. The
+     * options are intentionally not page-limited: their small payload lets the UI discover a
+     * location even when its first matching experience is beyond the current table page.
+     */
+    @Transactional(readOnly = true)
+    public ExperienceFilterOptions getExperienceFilterOptions(String slug, String roleSlug) {
+        Company company = companyRepository.findBySlug(slug)
+                .filter(Company::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException("Company not found: " + slug));
+        Role role = roleRepository.findBySlug(roleSlug)
+                .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + roleSlug));
+
+        List<Experience> experiences = experienceRepository
+                .findForCompanyRole(company.getId(), role.getId(), true);
+
+        List<String> levels = experiences.stream()
+                .map(this::displayLevelName)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
+
+        List<ExperienceLocationOption> locations = experiences.stream()
+                .map(Experience::getLocation)
+                .filter(Objects::nonNull)
+                .filter(location -> isPresent(location.getCity()) && isPresent(location.getState()))
+                .map(location -> new ExperienceLocationOption(
+                        location.getCity().trim(), location.getState().trim()))
+                .distinct()
+                .sorted(Comparator.comparing(ExperienceLocationOption::city, String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing(ExperienceLocationOption::state, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+
+        return new ExperienceFilterOptions(levels, locations);
     }
 
     /**
@@ -98,12 +144,13 @@ public class ExperienceService {
      */
     @Transactional(readOnly = true)
     public ExperienceStatsSummary getExperienceStats(String companySlug, String roleSlug,
-                                                     String level, String location) {
+                                                     String level, String city, String state) {
         String levelName = normalizeStatsFilter(level);
         if (levelName == null) {
             throw new IllegalArgumentException("level is required when requesting experience stats");
         }
-        String locationCity = normalizeStatsFilter(location);
+        String locationCity = normalizeLocationPair(city, state);
+        String locationState = locationCity == null ? null : state.trim();
 
         Company company = companyRepository.findBySlug(companySlug)
                 .filter(Company::isActive)
@@ -114,7 +161,8 @@ public class ExperienceService {
         var stats = locationCity == null
                 ? experienceRepository.aggregateForCompanyRoleAndLevel(company.getId(), role.getId(), levelName)
                 : experienceRepository.aggregateForCompanyRoleAndLevelAndLocation(
-                        company.getId(), role.getId(), levelName, locationCity);
+                        company.getId(), role.getId(), levelName,
+                        locationCity.toLowerCase(Locale.ROOT), locationState.toLowerCase(Locale.ROOT));
 
         long count = stats.getExperienceCount();
         return new ExperienceStatsSummary(
@@ -128,6 +176,28 @@ public class ExperienceService {
     private String normalizeStatsFilter(String value) {
         String normalized = blankToNull(value);
         return normalized == null ? null : normalized.toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeLocationPair(String city, String state) {
+        String cityName = blankToNull(city);
+        String stateName = blankToNull(state);
+        if ((cityName == null) != (stateName == null)) {
+            throw new IllegalArgumentException("city and state must be provided together");
+        }
+        return cityName;
+    }
+
+    private String normalizedLevelName(Experience experience) {
+        String displayName = displayLevelName(experience);
+        return displayName == null ? null : displayName.toLowerCase(Locale.ROOT);
+    }
+
+    private String displayLevelName(Experience experience) {
+        String snapshot = blankToNull(experience.getLevelName());
+        if (snapshot != null) {
+            return snapshot;
+        }
+        return experience.getLevel() == null ? null : blankToNull(experience.getLevel().getName());
     }
 
     /**

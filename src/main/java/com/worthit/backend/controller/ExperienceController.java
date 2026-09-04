@@ -1,6 +1,7 @@
 package com.worthit.backend.controller;
 
 import com.worthit.backend.dto.CreateExperienceRequest;
+import com.worthit.backend.dto.ExperienceFilterOptions;
 import com.worthit.backend.dto.ExperienceSummary;
 import com.worthit.backend.dto.ExperienceStatsSummary;
 import com.worthit.backend.dto.PageResponse;
@@ -31,20 +32,32 @@ public class ExperienceController {
     /**
      * {@code GET /api/v1/experiences} — list active experiences filtered by company + role
      * (see {@code api-endpoints.md} §2.4), newest first. The {@code company} and {@code role}
-     * query params are the company and role slugs; the optional {@code city} filters by location
-     * slug. Returns {@code 404} (via {@code GlobalExceptionHandler}) if no active company or role
-     * has the given slug, or the role is not offered at the company.
+     * query params are the company and role slugs; optional {@code level}, {@code city}, and
+     * {@code state} filters are applied before pagination. City and state must be supplied
+     * together. Returns {@code 404} (via {@code GlobalExceptionHandler}) if no active company or
+     * role has the given slug.
      */
     @GetMapping
     public PageResponse<ExperienceSummary> listExperiences(
             @RequestParam(required = false) String company,
             @RequestParam(required = false) String role,
+            @RequestParam(required = false) String level,
             @RequestParam(required = false) String city,
+            @RequestParam(required = false) String state,
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false) Integer limit) {
-        log.debug("GET /api/v1/experiences company={} role={} city={} cursor={} limit={}",
-                company, role, city, cursor, limit);
-        return experienceService.listExperiences(company, role, city, cursor, limit);
+        log.debug("GET /api/v1/experiences company={} role={} level={} city={} state={} cursor={} limit={}",
+                company, role, level, city, state, cursor, limit);
+        return experienceService.listExperiences(company, role, level, city, state, cursor, limit);
+    }
+
+    /** Complete level and city/state choices for the paginated experiences table. */
+    @GetMapping("/filter-options")
+    public ExperienceFilterOptions getExperienceFilterOptions(
+            @RequestParam String company,
+            @RequestParam String role) {
+        log.debug("GET /api/v1/experiences/filter-options company={} role={}", company, role);
+        return experienceService.getExperienceFilterOptions(company, role);
     }
 
     /**
@@ -57,10 +70,11 @@ public class ExperienceController {
             @RequestParam String company,
             @RequestParam String role,
             @RequestParam(required = false) String level,
-            @RequestParam(required = false) String location) {
-        log.debug("GET /api/v1/experiences/stats company={} role={} level={} location={}",
-                company, role, level, location);
-        return experienceService.getExperienceStats(company, role, level, location);
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) String state) {
+        log.debug("GET /api/v1/experiences/stats company={} role={} level={} city={} state={}",
+                company, role, level, city, state);
+        return experienceService.getExperienceStats(company, role, level, city, state);
     }
 
     /**
