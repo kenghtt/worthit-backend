@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
@@ -88,8 +89,111 @@ public class DataSeeder implements ApplicationRunner {
             "robinhood", "adobe", "dropbox", "instacart"
     );
 
+    private static final Map<String, CompanySeedProfile> COMPANY_PROFILES = Map.ofEntries(
+            Map.entry("amazon", new CompanySeedProfile(
+                    "Amazon runs one of the largest e-commerce and cloud platforms in the world.",
+                    "https://www.amazon.com",
+                    1550000
+            )),
+            Map.entry("google", new CompanySeedProfile(
+                    "Google builds search, ads, cloud, AI, and consumer software products at global scale.",
+                    "https://about.google",
+                    182000
+            )),
+            Map.entry("meta", new CompanySeedProfile(
+                    "Meta builds social, messaging, and mixed-reality products including Facebook, Instagram, and WhatsApp.",
+                    "https://about.meta.com",
+                    74000
+            )),
+            Map.entry("microsoft", new CompanySeedProfile(
+                    "Microsoft delivers enterprise software, cloud infrastructure, developer tools, and consumer productivity products.",
+                    "https://www.microsoft.com",
+                    228000
+            )),
+            Map.entry("stripe", new CompanySeedProfile(
+                    "Stripe provides payments and financial infrastructure for internet businesses.",
+                    "https://stripe.com",
+                    8000
+            )),
+            Map.entry("netflix", new CompanySeedProfile(
+                    "Netflix is a global streaming company producing and distributing entertainment content.",
+                    "https://www.netflix.com",
+                    14000
+            )),
+            Map.entry("apple", new CompanySeedProfile(
+                    "Apple designs consumer hardware, software, and services across mobile, desktop, and wearables.",
+                    "https://www.apple.com",
+                    161000
+            )),
+            Map.entry("uber", new CompanySeedProfile(
+                    "Uber operates ride-sharing, delivery, and logistics platforms in cities around the world.",
+                    "https://www.uber.com",
+                    31000
+            )),
+            Map.entry("airbnb", new CompanySeedProfile(
+                    "Airbnb runs a global marketplace for short-term stays and travel experiences.",
+                    "https://www.airbnb.com",
+                    7300
+            )),
+            Map.entry("salesforce", new CompanySeedProfile(
+                    "Salesforce builds CRM, automation, analytics, and customer-support software for businesses.",
+                    "https://www.salesforce.com",
+                    72600
+            )),
+            Map.entry("tesla", new CompanySeedProfile(
+                    "Tesla develops electric vehicles, energy storage products, and related software systems.",
+                    "https://www.tesla.com",
+                    121000
+            )),
+            Map.entry("linkedin", new CompanySeedProfile(
+                    "LinkedIn operates a professional network focused on hiring, creator content, and B2B products.",
+                    "https://www.linkedin.com",
+                    18000
+            )),
+            Map.entry("coinbase", new CompanySeedProfile(
+                    "Coinbase provides cryptocurrency trading, custody, and developer infrastructure products.",
+                    "https://www.coinbase.com",
+                    3800
+            )),
+            Map.entry("snap", new CompanySeedProfile(
+                    "Snap builds consumer social products centered around Snapchat, camera features, and AR tools.",
+                    "https://www.snap.com",
+                    5300
+            )),
+            Map.entry("lyft", new CompanySeedProfile(
+                    "Lyft operates rideshare, transit, and mobility services across the United States and Canada.",
+                    "https://www.lyft.com",
+                    3000
+            )),
+            Map.entry("doordash", new CompanySeedProfile(
+                    "DoorDash powers food delivery, local commerce, and logistics for consumers and merchants.",
+                    "https://www.doordash.com",
+                    19100
+            )),
+            Map.entry("robinhood", new CompanySeedProfile(
+                    "Robinhood offers retail investing, brokerage, and personal finance products.",
+                    "https://robinhood.com",
+                    2300
+            )),
+            Map.entry("adobe", new CompanySeedProfile(
+                    "Adobe makes creative, document, and digital experience software for individuals and enterprises.",
+                    "https://www.adobe.com",
+                    30000
+            )),
+            Map.entry("dropbox", new CompanySeedProfile(
+                    "Dropbox provides file storage, collaboration, and workflow tools for teams and individuals.",
+                    "https://www.dropbox.com",
+                    2200
+            )),
+            Map.entry("instacart", new CompanySeedProfile(
+                    "Instacart powers grocery delivery, pickup, and retail technology for stores and consumers.",
+                    "https://www.instacart.com",
+                    3500
+            ))
+    );
+
     private static final List<String[]> COMPANIES = List.of(
-            // {name, industry, headquarters}
+            // {name, industry, raw headquarters}
             new String[]{"Amazon", "Tech", "Seattle, WA"},
             new String[]{"Google", "Tech", "Mountain View, CA"},
             new String[]{"Meta", "Tech", "Menlo Park, CA"},
@@ -794,17 +898,60 @@ public class DataSeeder implements ApplicationRunner {
         int inserted = 0;
         for (String[] row : COMPANIES) {
             String slug = SlugUtil.slugify(row[0]);
-            if (companyRepository.findBySlug(slug).isPresent()) continue;
-            companyRepository.save(Company.builder()
-                    .slug(slug)
-                    .name(row[0])
-                    .industry(row[1])
-                    .headquarters(row[2])
-                    .active(true)
-                    .build());
-            inserted++;
+            Headquarters headquarters = parseHeadquarters(row[2]);
+            CompanySeedProfile profile = COMPANY_PROFILES.get(slug);
+            Company company = companyRepository.findBySlug(slug)
+                    .orElseGet(() -> Company.builder().slug(slug).build());
+            boolean isNew = company.getId() == null;
+
+            company.setName(row[0]);
+            company.setIndustry(row[1]);
+            company.setActive(true);
+            if (isBlank(company.getDescription()) && profile != null) {
+                company.setDescription(profile.description());
+            }
+            if (isBlank(company.getHqCity())) {
+                company.setHqCity(headquarters.city());
+            }
+            if (isBlank(company.getHqState())) {
+                company.setHqState(headquarters.state());
+            }
+            if (isBlank(company.getWebsiteUrl()) && profile != null) {
+                company.setWebsiteUrl(profile.websiteUrl());
+            }
+            if (company.getCompanySize() == null && profile != null) {
+                company.setCompanySize(profile.companySize());
+            }
+
+            companyRepository.save(company);
+            if (isNew) {
+                inserted++;
+            }
         }
         return inserted;
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private static Headquarters parseHeadquarters(String value) {
+        if (value == null || value.isBlank()) {
+            return new Headquarters(null, null);
+        }
+        int commaIndex = value.lastIndexOf(',');
+        if (commaIndex < 0) {
+            return new Headquarters(value.trim(), null);
+        }
+        String city = value.substring(0, commaIndex).trim();
+        String state = value.substring(commaIndex + 1).trim();
+        return new Headquarters(city.isEmpty() ? null : city, state.isEmpty() ? null : state);
+    }
+
+    private record Headquarters(String city, String state) {
+    }
+
+    private record CompanySeedProfile(String description, String websiteUrl, Integer companySize) {
     }
 
     private int seedRoles() {

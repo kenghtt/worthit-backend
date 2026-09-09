@@ -13,6 +13,10 @@ public record CompanyDetail(
         @JsonProperty("slug") String slug,
         @JsonProperty("name") String name,
         @JsonProperty("industry") String industry,
-        @JsonProperty("headquarters") String headquarters
+        @JsonProperty("description") String description,
+        @JsonProperty("hqCity") String hqCity,
+        @JsonProperty("hqState") String hqState,
+        @JsonProperty("websiteUrl") String websiteUrl,
+        @JsonProperty("companySize") Integer companySize
 ) {
 }

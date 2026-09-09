@@ -134,7 +134,11 @@ public class CompanyService {
                 c.getSlug(),
                 c.getName(),
                 c.getIndustry(),
-                c.getHeadquarters()
+                c.getDescription(),
+                c.getHqCity(),
+                c.getHqState(),
+                c.getWebsiteUrl(),
+                c.getCompanySize()
         );
     }
 
@@ -247,7 +251,11 @@ public class CompanyService {
                 c.getSlug(),
                 c.getName(),
                 c.getIndustry(),
-                c.getHeadquarters(),
+                c.getDescription(),
+                c.getHqCity(),
+                c.getHqState(),
+                c.getWebsiteUrl(),
+                c.getCompanySize(),
                 experienceCount,
                 roleCount,
                 avgWorth,

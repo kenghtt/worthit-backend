@@ -49,8 +49,20 @@ public class Company {
     @Column(length = 80)
     private String industry;
 
-    @Column(length = 160)
-    private String headquarters;
+    @Column(length = 500)
+    private String description;
+
+    @Column(name = "hq_city", length = 120)
+    private String hqCity;
+
+    @Column(name = "hq_state", length = 32)
+    private String hqState;
+
+    @Column(name = "website_url", length = 255)
+    private String websiteUrl;
+
+    @Column(name = "company_size")
+    private Integer companySize;
 
     @Column(nullable = false)
     @Builder.Default
