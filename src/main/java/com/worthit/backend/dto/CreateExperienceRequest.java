@@ -43,7 +43,8 @@ public record CreateExperienceRequest(
         @JsonProperty("stressLevel") @NotNull @DecimalMin("0.0") @DecimalMax("10.0") BigDecimal stressLevel,
         @JsonProperty("hoursPerWeek") @Min(0) Short hoursPerWeek,
         @JsonProperty("worthItScore") @NotNull @DecimalMin("0.0") @DecimalMax("10.0") BigDecimal worthItScore,
-        @JsonProperty("worthItReason") @WorthItReasonMaxLength String worthItReason
+        @JsonProperty("worthItReason") @WorthItReasonMaxLength String worthItReason,
+        @JsonProperty("turnstileToken") @NotBlank String turnstileToken
 ) {
 
     /**

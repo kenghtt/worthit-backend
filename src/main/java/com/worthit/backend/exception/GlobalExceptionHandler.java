@@ -67,6 +67,22 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, "Bad Request", "Invalid request", request, null);
     }
 
+    @ExceptionHandler(TurnstileVerificationException.class)
+    public ResponseEntity<ApiErrorResponse> handleTurnstileVerification(TurnstileVerificationException ex,
+                                                                        HttpServletRequest request) {
+        log.warn("Turnstile verification failed at {}: {}", request.getRequestURI(), ex.getMessage());
+        return build(HttpStatus.BAD_REQUEST, "Bad Request", "Turnstile verification failed", request,
+                List.of("turnstileToken: " + ex.getMessage()));
+    }
+
+    @ExceptionHandler(TurnstileConfigurationException.class)
+    public ResponseEntity<ApiErrorResponse> handleTurnstileConfiguration(TurnstileConfigurationException ex,
+                                                                         HttpServletRequest request) {
+        log.error("Turnstile configuration error at {}: {}", request.getRequestURI(), ex.getMessage());
+        return build(HttpStatus.SERVICE_UNAVAILABLE, "Service Unavailable",
+                "Submission verification is temporarily unavailable", request, null);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleGeneral(Exception ex, HttpServletRequest request) {
         log.error("Unhandled exception at {}: {}", request.getRequestURI(), ex.getMessage(), ex);

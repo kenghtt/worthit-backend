@@ -6,6 +6,8 @@ import com.worthit.backend.dto.ExperienceSummary;
 import com.worthit.backend.dto.ExperienceStatsSummary;
 import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.service.ExperienceService;
+import com.worthit.backend.service.TurnstileService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ExperienceController {
 
     private final ExperienceService experienceService;
+    private final TurnstileService turnstileService;
 
     /**
      * {@code GET /api/v1/experiences} — list active experiences filtered by company + role
@@ -85,9 +88,11 @@ public class ExperienceController {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ExperienceSummary createExperience(@Valid @RequestBody CreateExperienceRequest request) {
+    public ExperienceSummary createExperience(@Valid @RequestBody CreateExperienceRequest request,
+                                              HttpServletRequest httpRequest) {
         log.debug("POST /api/v1/experiences company={} companySlug={} role={} customRole={} city={}",
                 request.company(), request.companySlug(), request.role(), request.customRole(), request.city());
+        turnstileService.verifySubmissionToken(request.turnstileToken(), httpRequest.getRemoteAddr());
         return experienceService.createExperience(request);
     }
 }
