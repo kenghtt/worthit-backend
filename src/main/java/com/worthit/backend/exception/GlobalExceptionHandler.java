@@ -1,8 +1,10 @@
 package com.worthit.backend.exception;
 
+import com.worthit.backend.service.SubmissionAnalyticsService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -23,7 +25,10 @@ import java.util.List;
  */
 @Slf4j
 @RestControllerAdvice
+@RequiredArgsConstructor
 public class GlobalExceptionHandler {
+
+    private final SubmissionAnalyticsService submissionAnalyticsService;
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleResourceNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
@@ -49,6 +54,7 @@ public class GlobalExceptionHandler {
                 .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
                 .toList();
         log.warn("Validation failed at {}: {}", request.getRequestURI(), details);
+        submissionAnalyticsService.captureFailure(request, "validation", HttpStatus.BAD_REQUEST);
         return build(HttpStatus.BAD_REQUEST, "Bad Request", "Validation failed", request, details);
     }
 
@@ -58,12 +64,14 @@ public class GlobalExceptionHandler {
                 .map(v -> v.getPropertyPath() + ": " + v.getMessage())
                 .toList();
         log.warn("Constraint violation at {}: {}", request.getRequestURI(), details);
+        submissionAnalyticsService.captureFailure(request, "validation", HttpStatus.BAD_REQUEST);
         return build(HttpStatus.BAD_REQUEST, "Bad Request", "Validation failed", request, details);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
         log.warn("Illegal argument at {}: {}", request.getRequestURI(), ex.getMessage());
+        submissionAnalyticsService.captureFailure(request, "domain_validation", HttpStatus.BAD_REQUEST);
         return build(HttpStatus.BAD_REQUEST, "Bad Request", "Invalid request", request, null);
     }
 
@@ -71,6 +79,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleTurnstileVerification(TurnstileVerificationException ex,
                                                                         HttpServletRequest request) {
         log.warn("Turnstile verification failed at {}: {}", request.getRequestURI(), ex.getMessage());
+        submissionAnalyticsService.captureFailure(request, "turnstile_rejected", HttpStatus.BAD_REQUEST);
         return build(HttpStatus.BAD_REQUEST, "Bad Request", "Turnstile verification failed", request,
                 List.of("turnstileToken: " + ex.getMessage()));
     }
@@ -79,6 +88,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleTurnstileConfiguration(TurnstileConfigurationException ex,
                                                                          HttpServletRequest request) {
         log.error("Turnstile configuration error at {}: {}", request.getRequestURI(), ex.getMessage());
+        submissionAnalyticsService.captureFailure(request, "turnstile_unavailable", HttpStatus.SERVICE_UNAVAILABLE);
         return build(HttpStatus.SERVICE_UNAVAILABLE, "Service Unavailable",
                 "Submission verification is temporarily unavailable", request, null);
     }
@@ -86,6 +96,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleGeneral(Exception ex, HttpServletRequest request) {
         log.error("Unhandled exception at {}: {}", request.getRequestURI(), ex.getMessage(), ex);
+        submissionAnalyticsService.captureFailure(request, "internal", HttpStatus.INTERNAL_SERVER_ERROR);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", "An unexpected error occurred", request, null);
     }
 

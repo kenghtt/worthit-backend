@@ -6,6 +6,7 @@ import com.worthit.backend.dto.ExperienceSummary;
 import com.worthit.backend.dto.ExperienceStatsSummary;
 import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.service.ExperienceService;
+import com.worthit.backend.service.SubmissionAnalyticsService;
 import com.worthit.backend.service.TurnstileService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -31,6 +32,7 @@ public class ExperienceController {
 
     private final ExperienceService experienceService;
     private final TurnstileService turnstileService;
+    private final SubmissionAnalyticsService submissionAnalyticsService;
 
     /**
      * {@code GET /api/v1/experiences} — list active experiences filtered by company + role
@@ -54,7 +56,9 @@ public class ExperienceController {
         return experienceService.listExperiences(company, role, level, city, state, cursor, limit);
     }
 
-    /** Complete level and city/state choices for the paginated experiences table. */
+    /**
+     * Complete level and city/state choices for the paginated experiences table.
+     */
     @GetMapping("/filter-options")
     public ExperienceFilterOptions getExperienceFilterOptions(
             @RequestParam String company,
@@ -93,6 +97,8 @@ public class ExperienceController {
         log.debug("POST /api/v1/experiences company={} companySlug={} role={} customRole={} city={}",
                 request.company(), request.companySlug(), request.role(), request.customRole(), request.city());
         turnstileService.verifySubmissionToken(request.turnstileToken(), httpRequest.getRemoteAddr());
-        return experienceService.createExperience(request);
+        ExperienceSummary experience = experienceService.createExperience(request);
+        submissionAnalyticsService.captureSuccess(httpRequest, experience);
+        return experience;
     }
 }
