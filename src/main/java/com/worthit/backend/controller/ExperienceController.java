@@ -6,6 +6,9 @@ import com.worthit.backend.dto.ExperienceSummary;
 import com.worthit.backend.dto.ExperienceStatsSummary;
 import com.worthit.backend.dto.PageResponse;
 import com.worthit.backend.service.ExperienceService;
+import com.worthit.backend.service.ClientIpResolver;
+import com.worthit.backend.service.ExperienceRateLimiter;
+import com.worthit.backend.service.InMemoryRateLimiter;
 import com.worthit.backend.service.SubmissionAnalyticsService;
 import com.worthit.backend.service.TurnstileService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,6 +34,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class ExperienceController {
 
     private final ExperienceService experienceService;
+    private final ExperienceRateLimiter experienceRateLimiter;
+    private final ClientIpResolver clientIpResolver;
     private final TurnstileService turnstileService;
     private final SubmissionAnalyticsService submissionAnalyticsService;
 
@@ -96,8 +101,17 @@ public class ExperienceController {
                                               HttpServletRequest httpRequest) {
         log.debug("POST /api/v1/experiences company={} companySlug={} role={} customRole={} city={}",
                 request.company(), request.companySlug(), request.role(), request.customRole(), request.city());
-        turnstileService.verifySubmissionToken(request.turnstileToken(), httpRequest.getRemoteAddr());
-        ExperienceSummary experience = experienceService.createExperience(request);
+        String clientIp = clientIpResolver.resolve(httpRequest);
+        turnstileService.verifySubmissionToken(request.turnstileToken(), clientIp);
+        InMemoryRateLimiter.Reservation rateLimitReservation =
+                experienceRateLimiter.checkAndRecordSubmission(clientIp);
+        ExperienceSummary experience;
+        try {
+            experience = experienceService.createExperience(request);
+        } catch (RuntimeException ex) {
+            experienceRateLimiter.rollBackSubmission(rateLimitReservation);
+            throw ex;
+        }
         submissionAnalyticsService.captureSuccess(httpRequest, experience);
         return experience;
     }

@@ -65,12 +65,12 @@ public class TurnstileService {
 
         if (response == null || !response.success()) {
             List<String> errorCodes = response == null ? List.of() : response.errorCodes();
-            log.warn("Turnstile verification failed. remoteIp={} hostname={} errors={}",
-                    remoteIp, response == null ? null : response.hostname(), errorCodes);
+            log.warn("Turnstile verification failed. hostname={} errors={}",
+                    response == null ? null : response.hostname(), errorCodes);
             throw new TurnstileVerificationException(mapFailureMessage(errorCodes));
         }
 
-        log.debug("Turnstile verification passed. remoteIp={} hostname={}", remoteIp, response.hostname());
+        log.debug("Turnstile verification passed. hostname={}", response.hostname());
     }
 
     private String mapFailureMessage(List<String> errorCodes) {

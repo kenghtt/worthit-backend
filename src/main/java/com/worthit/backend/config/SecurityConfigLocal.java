@@ -1,5 +1,7 @@
 package com.worthit.backend.config;
 
+import com.worthit.backend.filter.ApiRateLimitFilter;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -11,16 +13,17 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
 import java.util.Arrays;
 import java.util.List;
 
 /**
  * Permissive security chain for local development / starter mode.
- *
+ * <p>
  * Active when {@code security.auth.enabled=false} (the default in application.properties),
  * which is the case for this barebones starter so that the app boots without any JWT issuer configured.
- *
+ * <p>
  * TODO(worthIt): once a real auth provider (e.g. Supabase / Auth0 / Cognito) is chosen, flip
  *  {@code security.auth.enabled=true} in the relevant profile and provide the JWKS / issuer values
  *  required by {@link SecurityConfig}.
@@ -34,13 +37,15 @@ public class SecurityConfigLocal {
     private List<String> allowedOrigins;
 
     @Bean
-    public SecurityFilterChain securityFilterChainLocal(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChainLocal(HttpSecurity http,
+                                                        ApiRateLimitFilter apiRateLimitFilter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(authz -> authz
                         .anyRequest().permitAll()
-                );
+                )
+                .addFilterAfter(apiRateLimitFilter, CorsFilter.class);
         return http.build();
     }
 

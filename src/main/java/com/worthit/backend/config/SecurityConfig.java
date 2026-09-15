@@ -1,5 +1,6 @@
 package com.worthit.backend.config;
 
+import com.worthit.backend.filter.ApiRateLimitFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +23,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.filter.CorsFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -71,7 +73,7 @@ public class SecurityConfig {
     private List<String> allowedOrigins;
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, ApiRateLimitFilter apiRateLimitFilter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
@@ -101,7 +103,8 @@ public class SecurityConfig {
                         log.warn("Forbidden request to {} {}", request.getMethod(), request.getRequestURI());
                         response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden");
                     });
-                });
+                })
+                .addFilterAfter(apiRateLimitFilter, CorsFilter.class);
 
         return http.build();
     }

@@ -4,6 +4,7 @@ import com.worthit.backend.dto.CreateFeedbackRequest;
 import com.worthit.backend.dto.FeedbackSubmissionResponse;
 import com.worthit.backend.service.FeedbackRateLimiter;
 import com.worthit.backend.service.FeedbackService;
+import com.worthit.backend.service.ClientIpResolver;
 import com.worthit.backend.service.SubmissionAnalyticsService;
 import com.worthit.backend.service.TurnstileService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,6 +28,7 @@ public class FeedbackController {
 
     private final FeedbackService feedbackService;
     private final FeedbackRateLimiter feedbackRateLimiter;
+    private final ClientIpResolver clientIpResolver;
     private final SubmissionAnalyticsService submissionAnalyticsService;
     private final TurnstileService turnstileService;
 
@@ -34,7 +36,7 @@ public class FeedbackController {
     @ResponseStatus(HttpStatus.CREATED)
     public FeedbackSubmissionResponse createFeedback(@Valid @RequestBody CreateFeedbackRequest request,
                                                      HttpServletRequest httpRequest) {
-        String remoteIp = httpRequest.getRemoteAddr();
+        String remoteIp = clientIpResolver.resolve(httpRequest);
         turnstileService.verifySubmissionToken(request.turnstileToken(), remoteIp);
         Instant rateLimitReservation = feedbackRateLimiter.checkAndRecordSubmission(remoteIp);
         FeedbackSubmissionResponse response;

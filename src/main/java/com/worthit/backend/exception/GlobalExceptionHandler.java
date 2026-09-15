@@ -96,10 +96,20 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(FeedbackRateLimitExceededException.class)
     public ResponseEntity<ApiErrorResponse> handleFeedbackRateLimit(FeedbackRateLimitExceededException ex,
                                                                     HttpServletRequest request) {
-        log.warn("Feedback rate limit exceeded at {}", request.getRequestURI());
         submissionAnalyticsService.captureFailure(request, "rate_limited", HttpStatus.TOO_MANY_REQUESTS);
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+                .header("Cache-Control", "no-store")
+                .body(buildBody(HttpStatus.TOO_MANY_REQUESTS, "Too Many Requests", ex.getMessage(), request, null));
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ApiErrorResponse> handleRateLimit(RateLimitExceededException ex,
+                                                            HttpServletRequest request) {
+        submissionAnalyticsService.captureFailure(request, "rate_limited", HttpStatus.TOO_MANY_REQUESTS);
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+                .header("Cache-Control", "no-store")
                 .body(buildBody(HttpStatus.TOO_MANY_REQUESTS, "Too Many Requests", ex.getMessage(), request, null));
     }
 
