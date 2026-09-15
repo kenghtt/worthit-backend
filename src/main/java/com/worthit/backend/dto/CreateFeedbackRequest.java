@@ -11,6 +11,6 @@ public record CreateFeedbackRequest(
         @JsonProperty("category") @NotNull FeedbackCategory category,
         @JsonProperty("email") @Email @Size(max = 254) String email,
         @JsonProperty("message") @NotBlank @Size(max = 500) String message,
-        @JsonProperty("turnstileToken") @NotBlank String turnstileToken
+        @JsonProperty("turnstileToken") @NotBlank @Size(max = 2048) String turnstileToken
 ) {
 }

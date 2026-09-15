@@ -102,7 +102,8 @@ public class ExperienceController {
         log.debug("POST /api/v1/experiences company={} companySlug={} role={} customRole={} city={}",
                 request.company(), request.companySlug(), request.role(), request.customRole(), request.city());
         String clientIp = clientIpResolver.resolve(httpRequest);
-        turnstileService.verifySubmissionToken(request.turnstileToken(), clientIp);
+        turnstileService.verifySubmissionToken(
+                request.turnstileToken(), clientIp, TurnstileService.EXPERIENCE_ACTION);
         InMemoryRateLimiter.Reservation rateLimitReservation =
                 experienceRateLimiter.checkAndRecordSubmission(clientIp);
         ExperienceSummary experience;

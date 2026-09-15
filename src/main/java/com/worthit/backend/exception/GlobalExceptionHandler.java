@@ -36,12 +36,6 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "Not Found", "Requested resource was not found", request, null);
     }
 
-    @ExceptionHandler(UnauthorizedException.class)
-    public ResponseEntity<ApiErrorResponse> handleUnauthorized(UnauthorizedException ex, HttpServletRequest request) {
-        log.warn("Unauthorized request at {}: {}", request.getRequestURI(), ex.getMessage());
-        return build(HttpStatus.UNAUTHORIZED, "Unauthorized", "Authentication is required or token is invalid", request, null);
-    }
-
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiErrorResponse> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
         log.warn("Access denied at {}: {}", request.getRequestURI(), ex.getMessage());

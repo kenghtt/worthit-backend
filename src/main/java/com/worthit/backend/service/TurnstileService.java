@@ -7,6 +7,7 @@ import com.worthit.backend.exception.TurnstileConfigurationException;
 import com.worthit.backend.exception.TurnstileVerificationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.StringUtils;
@@ -14,11 +15,16 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
+import java.net.http.HttpClient;
 
 @Service
 @Slf4j
 public class TurnstileService {
+
+    public static final String FEEDBACK_ACTION = "submit_feedback";
+    public static final String EXPERIENCE_ACTION = "submit_experience";
 
     private static final String EXPIRED_OR_DUPLICATE = "timeout-or-duplicate";
     private static final String MISSING_RESPONSE = "missing-input-response";
@@ -28,11 +34,16 @@ public class TurnstileService {
     private final TurnstileProperties turnstileProperties;
 
     public TurnstileService(RestClient.Builder restClientBuilder, TurnstileProperties turnstileProperties) {
-        this.restClient = restClientBuilder.build();
         this.turnstileProperties = turnstileProperties;
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(turnstileProperties.getConnectTimeout())
+                .build();
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
+        requestFactory.setReadTimeout(turnstileProperties.getReadTimeout());
+        this.restClient = restClientBuilder.requestFactory(requestFactory).build();
     }
 
-    public void verifySubmissionToken(String token, String remoteIp) {
+    public void verifySubmissionToken(String token, String remoteIp, String expectedAction) {
         if (!StringUtils.hasText(token)) {
             throw new TurnstileVerificationException("Complete the verification before submitting.");
         }
@@ -70,7 +81,28 @@ public class TurnstileService {
             throw new TurnstileVerificationException(mapFailureMessage(errorCodes));
         }
 
-        log.debug("Turnstile verification passed. hostname={}", response.hostname());
+        if (!isAllowedHostname(response.hostname())) {
+            log.warn("Turnstile verification returned an unexpected hostname.");
+            throw new TurnstileVerificationException("Verification was issued for an unexpected website.");
+        }
+
+        if (!expectedAction.equals(response.action())) {
+            log.warn("Turnstile verification returned an unexpected action.");
+            throw new TurnstileVerificationException("Verification was issued for a different operation.");
+        }
+
+        log.debug("Turnstile verification passed. hostname={} action={}", response.hostname(), response.action());
+    }
+
+    private boolean isAllowedHostname(String hostname) {
+        if (!StringUtils.hasText(hostname) || turnstileProperties.getAllowedHostnames().isEmpty()) {
+            return false;
+        }
+        String normalizedHostname = hostname.trim().toLowerCase(Locale.ROOT);
+        return turnstileProperties.getAllowedHostnames().stream()
+                .filter(StringUtils::hasText)
+                .map(value -> value.trim().toLowerCase(Locale.ROOT))
+                .anyMatch(normalizedHostname::equals);
     }
 
     private String mapFailureMessage(List<String> errorCodes) {
@@ -89,6 +121,7 @@ public class TurnstileService {
     private record TurnstileSiteVerifyResponse(
             boolean success,
             String hostname,
+            String action,
             @JsonProperty("error-codes") List<String> errorCodes
     ) {
         private TurnstileSiteVerifyResponse {

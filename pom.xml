@@ -26,14 +26,10 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- Security + JWT (OAuth2 resource server). Wired but disabled by default for local startup. -->
+        <!-- Security headers, CORS, and explicit public endpoint rules. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
         </dependency>
 
         <!-- Bean Validation (jakarta.validation) -->

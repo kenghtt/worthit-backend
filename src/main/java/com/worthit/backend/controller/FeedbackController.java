@@ -37,7 +37,8 @@ public class FeedbackController {
     public FeedbackSubmissionResponse createFeedback(@Valid @RequestBody CreateFeedbackRequest request,
                                                      HttpServletRequest httpRequest) {
         String remoteIp = clientIpResolver.resolve(httpRequest);
-        turnstileService.verifySubmissionToken(request.turnstileToken(), remoteIp);
+        turnstileService.verifySubmissionToken(
+                request.turnstileToken(), remoteIp, TurnstileService.FEEDBACK_ACTION);
         Instant rateLimitReservation = feedbackRateLimiter.checkAndRecordSubmission(remoteIp);
         FeedbackSubmissionResponse response;
         try {

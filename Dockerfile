@@ -16,9 +16,10 @@ RUN ./mvnw clean package -DskipTests -B
 # Stage 2: Run
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
-COPY --from=build /app/target/*.jar app.jar
+RUN addgroup -S worthit && adduser -S worthit -G worthit
+COPY --from=build --chown=worthit:worthit /app/target/*.jar app.jar
 
 EXPOSE 8080
 
-# TODO(worthIt): set SPRING_PROFILES_ACTIVE=prod and inject real secrets via env in deployment.
+USER worthit
 ENTRYPOINT ["java", "-jar", "app.jar"]
