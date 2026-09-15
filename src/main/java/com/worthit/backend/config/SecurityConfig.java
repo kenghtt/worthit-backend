@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -86,6 +87,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authz -> authz
                         // Public probes — keep these open even when auth is enabled.
                         .requestMatchers("/", "/api/hello", "/actuator/health").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/feedback").permitAll()
                         // TODO(worthIt): add public endpoints (e.g. /api/auth/**) here as needed.
                         .anyRequest().authenticated()
                 )

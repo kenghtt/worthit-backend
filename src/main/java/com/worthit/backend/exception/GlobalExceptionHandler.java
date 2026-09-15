@@ -93,6 +93,16 @@ public class GlobalExceptionHandler {
                 "Submission verification is temporarily unavailable", request, null);
     }
 
+    @ExceptionHandler(FeedbackRateLimitExceededException.class)
+    public ResponseEntity<ApiErrorResponse> handleFeedbackRateLimit(FeedbackRateLimitExceededException ex,
+                                                                    HttpServletRequest request) {
+        log.warn("Feedback rate limit exceeded at {}", request.getRequestURI());
+        submissionAnalyticsService.captureFailure(request, "rate_limited", HttpStatus.TOO_MANY_REQUESTS);
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+                .body(buildBody(HttpStatus.TOO_MANY_REQUESTS, "Too Many Requests", ex.getMessage(), request, null));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleGeneral(Exception ex, HttpServletRequest request) {
         log.error("Unhandled exception at {}: {}", request.getRequestURI(), ex.getMessage(), ex);
@@ -102,7 +112,12 @@ public class GlobalExceptionHandler {
 
     private ResponseEntity<ApiErrorResponse> build(HttpStatus status, String error, String message,
                                                    HttpServletRequest request, List<String> details) {
-        ApiErrorResponse body = ApiErrorResponse.builder()
+        return new ResponseEntity<>(buildBody(status, error, message, request, details), status);
+    }
+
+    private ApiErrorResponse buildBody(HttpStatus status, String error, String message,
+                                       HttpServletRequest request, List<String> details) {
+        return ApiErrorResponse.builder()
                 .timestamp(OffsetDateTime.now())
                 .status(status.value())
                 .error(error)
@@ -110,6 +125,5 @@ public class GlobalExceptionHandler {
                 .path(request.getRequestURI())
                 .details(details)
                 .build();
-        return new ResponseEntity<>(body, status);
     }
 }

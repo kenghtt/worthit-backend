@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.worthit.backend.config.PostHogProperties;
 import com.worthit.backend.dto.ExperienceSummary;
+import com.worthit.backend.entity.FeedbackCategory;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -26,7 +27,8 @@ public class SubmissionAnalyticsService {
     public static final String SUBMISSION_ID_HEADER = "X-WorthIt-Submission-Id";
     public static final String DISTINCT_ID_HEADER = "X-PostHog-Distinct-Id";
 
-    private static final String SUBMISSION_PATH = "/api/v1/experiences";
+    private static final String EXPERIENCE_SUBMISSION_PATH = "/api/v1/experiences";
+    private static final String FEEDBACK_SUBMISSION_PATH = "/api/v1/feedback";
     private static final int MAX_DISTINCT_ID_LENGTH = 200;
 
     private final PostHogProperties properties;
@@ -42,7 +44,7 @@ public class SubmissionAnalyticsService {
     }
 
     public void captureSuccess(HttpServletRequest request, ExperienceSummary experience) {
-        if (!isSubmission(request)) {
+        if (!isSubmission(request, EXPERIENCE_SUBMISSION_PATH)) {
             return;
         }
 
@@ -54,12 +56,30 @@ public class SubmissionAnalyticsService {
         capture("backend_experience_submitted", request, eventProperties);
     }
 
-    public void captureFailure(HttpServletRequest request, String failureType, HttpStatus status) {
-        if (!isSubmission(request)) {
+    public void captureFeedbackSuccess(HttpServletRequest request, FeedbackCategory category,
+                                       boolean hasEmail, int messageLength) {
+        if (!isSubmission(request, FEEDBACK_SUBMISSION_PATH)) {
             return;
         }
 
-        capture("backend_experience_submission_failed", request, Map.of(
+        capture("backend_feedback_submitted", request, Map.of(
+                "category", category.name(),
+                "has_email", hasEmail,
+                "message_length", messageLength
+        ));
+    }
+
+    public void captureFailure(HttpServletRequest request, String failureType, HttpStatus status) {
+        String event;
+        if (isSubmission(request, EXPERIENCE_SUBMISSION_PATH)) {
+            event = "backend_experience_submission_failed";
+        } else if (isSubmission(request, FEEDBACK_SUBMISSION_PATH)) {
+            event = "backend_feedback_submission_failed";
+        } else {
+            return;
+        }
+
+        capture(event, request, Map.of(
                 "failure_type", failureType,
                 "http_status", status.value()
         ));
@@ -129,8 +149,8 @@ public class SubmissionAnalyticsService {
         return URI.create(properties.getHost().replaceAll("/+$", "") + "/i/v0/e");
     }
 
-    private boolean isSubmission(HttpServletRequest request) {
-        return "POST".equalsIgnoreCase(request.getMethod()) && SUBMISSION_PATH.equals(request.getRequestURI());
+    private boolean isSubmission(HttpServletRequest request, String path) {
+        return "POST".equalsIgnoreCase(request.getMethod()) && path.equals(request.getRequestURI());
     }
 
     private record AnalyticsContext(String submissionId, String distinctId) {
